@@ -10,10 +10,10 @@ lazy_static! {
         // Configure lines
         Regex::new(r"^> Configure project ").unwrap(),
         // Daemon startup
-        Regex::new(r"^(Starting Gradle Daemon|Gradle Daemon started|Daemon initialized|Worker lease)").unwrap(),
+        Regex::new(r"^(Starting a? ?Gradle Daemon|Gradle Daemon started|Daemon initialized|Worker lease)").unwrap(),
         // JVM warnings
         Regex::new(r"^(OpenJDK 64-Bit Server VM warning:|Initialized native services|Initialized jansi)").unwrap(),
-        // Incubating
+        // Incubating (including Problems report)
         Regex::new(r"\[Incubating\]|Configuration on demand is an incubating feature|Parallel Configuration Cache is an incubating feature").unwrap(),
         // Config cache
         Regex::new(r"^(Reusing configuration cache|Calculating task graph|Configuration cache entry|Storing configuration cache|Loading configuration cache)").unwrap(),
@@ -22,12 +22,12 @@ lazy_static! {
         // Downloads + progress bars
         Regex::new(r"^(Download |Downloading )").unwrap(),
         Regex::new(r"^\s*\[[\s<=\->]+\]\s+\d+%").unwrap(),
-        // Build scan
-        Regex::new(r"^(Publishing build scan|https://develocity\.|https://faire\.link/|Upload .* build scan|Waiting for build scan)").unwrap(),
-        // VFS
-        Regex::new(r"^(VFS>|Virtual file system ret)").unwrap(),
-        // Learn more / task referenced
-        Regex::new(r"^(Learn more about how you can focus|This task referenced )").unwrap(),
+        // Build scan + develocity URLs
+        Regex::new(r"^(Publishing build scan|https://develocity\.|Upload .* build scan|Waiting for build scan)").unwrap(),
+        // VFS (all VFS> lines and Virtual file system lines)
+        Regex::new(r"^(VFS>|Virtual file system )").unwrap(),
+        // Focus plugin messages (ANSI colored or plain)
+        Regex::new(r"This task referenced \d+ projects|Learn more about how you can focus|^\[33m|^\[0m$").unwrap(),
         // Evaluation
         Regex::new(r"^(Evaluating root project|All projects evaluated|Settings evaluated)").unwrap(),
         // Classpath
@@ -36,8 +36,12 @@ lazy_static! {
         Regex::new(r"^(Kotlin compile daemon|Connected to the daemon)").unwrap(),
         // Reflection warnings
         Regex::new(r"(?i)^WARNING:.*illegal reflective|(?i)^WARNING:.*reflect").unwrap(),
-        // Received
-        Regex::new(r"^Received ").unwrap(),
+        // File system events
+        Regex::new(r"^Received \d+ file system events").unwrap(),
+        // AWS SSO / authentication warnings (common in CI/dev environments)
+        Regex::new(r"^aws: \[ERROR\]|^.*AWS CLI is not authenticated").unwrap(),
+        // ANSI escape sequences (bare color codes on their own line)
+        Regex::new(r"^\x1b\[\d+m\s*$").unwrap(),
     ];
 }
 
