@@ -1,0 +1,29 @@
+---
+source: src/gradle/test_filter.rs
+expression: output
+---
+com.example.payments.integration.PaymentFlowIntegrationTest > testChargeWithInvalidCard FAILED
+    org.opentest4j.AssertionFailedError: Expected charge to fail with InvalidCard but got: Success
+        at org.junit.jupiter.api.AssertionUtils.fail(AssertionUtils.java:55)
+        at com.example.payments.integration.helpers.IntegrationAssertions.assertChargeFailure(IntegrationAssertions.kt:28)
+        at com.example.payments.integration.PaymentFlowIntegrationTest.testChargeWithInvalidCard(PaymentFlowIntegrationTest.kt:95)
+    ... 14 more
+        Caused by: com.example.payments.exceptions.PaymentProcessingException: Card validation failed
+            at com.example.payments.CardValidator.validate(CardValidator.kt:55)
+            at com.example.payments.ChargeService.charge(ChargeService.kt:32)
+            at com.example.payments.integration.PaymentFlowIntegrationTest.testChargeWithInvalidCard(PaymentFlowIntegrationTest.kt:90)
+    ... 13 more
+
+
+> Task :app-payments:integrationTest FAILED
+
+3 tests completed, 1 failed
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app-payments:integrationTest'.
+> There were failing tests. See the report at: file://app-payments/build/reports/tests/integrationTest/index.html
+
+BUILD FAILED in 120s
+10 actionable tasks: 1 executed, 9 up-to-date
