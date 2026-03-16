@@ -1,6 +1,7 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 
+use super::compile;
 use super::detekt;
 use super::global;
 use super::test_filter;
@@ -195,6 +196,7 @@ fn detect_task_type_from_name(task_name: &str) -> TaskType {
 /// Filter a single task section content based on its type.
 fn filter_section_content(content: &str, task_type: &TaskType) -> String {
     match task_type {
+        TaskType::Compile => compile::filter_compile(content),
         TaskType::Test | TaskType::IntegrationTest => {
             test_filter::filter_test(content, task_type == &TaskType::IntegrationTest)
         }

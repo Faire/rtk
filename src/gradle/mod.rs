@@ -168,9 +168,10 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
 /// Apply task-type-specific filtering to gradle output.
 pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
-    // For Generic with multiple tasks, use batch filter on raw input
-    // (it needs to see > Task lines before global filtering strips them)
-    if task_type == &TaskType::Generic && has_multiple_tasks(raw) {
+    // For batch runs (multiple executed tasks), use batch filter on raw input
+    // regardless of detected task type — batch filter splits by task boundaries
+    // and applies per-section filters, preserving per-task context.
+    if has_multiple_tasks(raw) {
         let globally_filtered = global::apply_global_filters(raw);
         return batch::filter_batch_from_raw(raw, &globally_filtered);
     }
