@@ -1,0 +1,69 @@
+Starting Gradle Daemon...
+Gradle Daemon started in 2456 ms
+Daemon initialized in 324 ms
+Worker lease acquired for :app-payments
+> Configure project :
+> Configure project :app-billing
+> Configure project :app-orders
+Calculating task graph as no cached configuration is available for tasks: :app-payments:assemble
+Configuration cache entry stored.
+Storing configuration cache entry for tasks: :app-payments:assemble
+Loading configuration cache entry for tasks: :app-payments:assemble
+Evaluating root project 'backend' using build file '/Users/developer/backend/build.gradle.kts'.
+Settings evaluated using settings file '/Users/developer/backend/settings.gradle.kts'.
+All projects evaluated.
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+Initialized native services in: /Users/developer/.gradle/native
+Initialized jansi terminal
+VFS> Invalidating /Users/developer/backend/app-payments/src/main/kotlin
+Virtual file system retains 95% of files since last build
+[Incubating] Configuration on demand is an incubating feature.
+Parallel Configuration Cache is an incubating feature.
+Download https://repo.example.com/com/google/guava/guava/31.1-jre/guava-31.1-jre.pom
+Downloading https://repo.example.com/com/google/guava/guava/31.1-jre/guava-31.1-jre.jar
+ [=====>                            ] 15%
+ [==================>               ] 55%
+ [=================================>] 100%
+Received 4.2 MB
+Kotlin compile daemon is already running; skipping startup
+Connected to the daemon on port 12345
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by com.google.inject.internal.cglib.core.$ReflectUtils
+> Task :app-common:compileKotlin UP-TO-DATE
+> Task :app-common:compileJava NO-SOURCE
+> Task :app-common:processResources UP-TO-DATE
+> Task :app-common:classes UP-TO-DATE
+> Task :app-common:jar UP-TO-DATE
+> Task :app-payments:compileKotlin UP-TO-DATE
+> Task :app-payments:compileJava NO-SOURCE
+> Task :app-payments:processResources UP-TO-DATE
+> Task :app-payments:classes UP-TO-DATE
+> Task :app-payments:jar UP-TO-DATE
+> Task :app-payments:assemble UP-TO-DATE
+Classpath snapshot stored in 42 ms
+Snapshotting classpath for :app-payments
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they are coming from your own scripts or plugins.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Learn more about how you can focus on task output: https://docs.gradle.org/8.5/userguide/logging.html
+This task referenced 3 deprecated features.
+
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+Publishing build scan...
+https://develocity.example.com/s/def456uvw
+Upload 12 build scan artifacts
+Waiting for build scan upload to complete
+
+BUILD SUCCESSFUL in 25s
+11 actionable tasks: 0 executed, 11 up-to-date

@@ -1,0 +1,34 @@
+Starting Gradle Daemon...
+Gradle Daemon started in 1854 ms
+> Configure project :
+> Configure project :app-billing
+> Configure project :app-orders
+> Configure project :app-payments
+Calculating task graph as no cached configuration is available for tasks: :app-payments:compileKotlin
+Evaluating root project 'backend' using build file '/Users/developer/backend/build.gradle.kts'.
+All projects evaluated.
+> Task :app-common:compileKotlin UP-TO-DATE
+> Task :app-common:compileJava NO-SOURCE
+> Task :app-common:processResources UP-TO-DATE
+> Task :app-common:classes UP-TO-DATE
+> Task :app-common:jar UP-TO-DATE
+> Task :app-payments:kaptGenerateStubsKotlin UP-TO-DATE
+> Task :app-payments:kaptKotlin UP-TO-DATE
+> Task :app-payments:compileKotlin
+Kotlin compile daemon is already running; skipping startup
+Connected to the daemon on port 12345
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+Initialized native services in: /Users/developer/.gradle/native
+Initialized jansi terminal
+> Task :app-payments:compileJava NO-SOURCE
+> Task :app-payments:processResources UP-TO-DATE
+> Task :app-payments:classes UP-TO-DATE
+Reusing configuration cache.
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they are coming from your own scripts or plugins.
+Publishing build scan...
+https://develocity.example.com/s/abc123xyz
+
+BUILD SUCCESSFUL in 12s
+8 actionable tasks: 1 executed, 7 up-to-date
