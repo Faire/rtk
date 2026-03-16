@@ -47,16 +47,17 @@ pub fn detect_task_type(args: &[String]) -> TaskType {
             continue;
         }
 
-        // Extract the task name (last segment after :)
+        // Extract the task name (last segment after :), lowercased for
+        // case-insensitive CLI matching (Gradle accepts any casing on CLI).
         let task_name = match arg.rfind(':') {
-            Some(pos) => &arg[pos + 1..],
-            None => arg,
+            Some(pos) => arg[pos + 1..].to_ascii_lowercase(),
+            None => arg.to_ascii_lowercase(),
         };
 
         // Walk registry in priority order, first match wins
         let task_type = TASK_TYPE_REGISTRY
             .iter()
-            .find(|(matcher, _)| matcher(task_name))
+            .find(|(matcher, _)| matcher(&task_name))
             .map(|(_, tt)| tt.clone());
 
         if let Some(tt) = task_type {
@@ -114,10 +115,10 @@ pub fn detect_task_type_from_output(raw: &str) -> TaskType {
 pub fn is_integration_test(args: &[String]) -> bool {
     args.iter().any(|arg| {
         let task_name = match arg.rfind(':') {
-            Some(pos) => &arg[pos + 1..],
-            None => arg.as_str(),
+            Some(pos) => arg[pos + 1..].to_ascii_lowercase(),
+            None => arg.to_ascii_lowercase(),
         };
-        test_filter::is_integration_task_name(task_name)
+        test_filter::is_integration_task_name(&task_name)
     })
 }
 
@@ -447,6 +448,50 @@ mod tests {
             ":app:billing:integrationTest".to_string(),
             "--info".to_string(),
         ];
+        assert!(is_integration_test(&args));
+    }
+
+    // --- case-insensitive matching tests ---
+
+    #[test]
+    fn test_detect_case_insensitive_test() {
+        let args = vec![":app:billing:Test".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Test);
+    }
+
+    #[test]
+    fn test_detect_case_insensitive_compile_kotlin() {
+        let args = vec![":app:billing:CompileKotlin".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Compile);
+    }
+
+    #[test]
+    fn test_detect_case_insensitive_detekt() {
+        let args = vec![":app:billing:Detekt".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Detekt);
+    }
+
+    #[test]
+    fn test_detect_case_insensitive_project_health() {
+        let args = vec![":app:billing:ProjectHealth".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Health);
+    }
+
+    #[test]
+    fn test_detect_case_insensitive_dependencies() {
+        let args = vec![":app:billing:Dependencies".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Deps);
+    }
+
+    #[test]
+    fn test_detect_case_insensitive_build_protos() {
+        let args = vec![":app:billing:BuildProtos".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Proto);
+    }
+
+    #[test]
+    fn test_is_integration_test_case_insensitive() {
+        let args = vec![":app:billing:IntegrationTest".to_string()];
         assert!(is_integration_test(&args));
     }
 }

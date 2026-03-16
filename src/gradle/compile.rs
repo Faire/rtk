@@ -1,9 +1,10 @@
 /// Returns true if the task name is a compile task.
 /// Matches any source set: compileKotlin, compileTestKotlin, compileIntegrationTestJava, etc.
+/// Expects lowercase input from detect_task_type; output-based detection passes properly-cased names.
 pub fn matches_task(task_name: &str) -> bool {
-    (task_name.starts_with("compile")
-        && (task_name.ends_with("Kotlin") || task_name.ends_with("Java")))
-        || task_name.ends_with("Classes")
+    let t = task_name.to_ascii_lowercase();
+    (t.starts_with("compile") && (t.ends_with("kotlin") || t.ends_with("java")))
+        || t.ends_with("classes")
 }
 
 /// COMPILE-specific filtering.

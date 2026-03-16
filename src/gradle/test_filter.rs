@@ -1,23 +1,27 @@
 /// Returns true if the task name is any kind of test task (unit, integration, component, Android).
+/// Case-insensitive: callers may pass lowercase (CLI args) or original casing (output detection).
 pub fn matches_task(task_name: &str) -> bool {
+    let t = task_name.to_ascii_lowercase();
     // Unit test tasks
-    task_name == "test"
-        || (task_name.starts_with("test") && task_name.ends_with("UnitTest"))
+    t == "test"
+        || (t.starts_with("test") && t.ends_with("unittest"))
         // Integration/component test tasks
-        || task_name == "integrationTest"
-        || task_name == "componentTest"
+        || t == "integrationtest"
+        || t == "componenttest"
         // Android instrumented tests
-        || task_name.contains("AndroidTest")
-        || task_name.starts_with("connected")
+        || t.contains("androidtest")
+        || t.starts_with("connected")
 }
 
 /// Returns true if the task name specifically refers to an integration/component/instrumented test.
 /// Used to enable integration-specific noise filtering (Hibernate, Spring, etc.)
+/// Case-insensitive: callers may pass lowercase (CLI args) or original casing.
 pub fn is_integration_task_name(task_name: &str) -> bool {
-    task_name == "integrationTest"
-        || task_name == "componentTest"
-        || task_name.contains("AndroidTest")
-        || task_name.starts_with("connected")
+    let t = task_name.to_ascii_lowercase();
+    t == "integrationtest"
+        || t == "componenttest"
+        || t.contains("androidtest")
+        || t.starts_with("connected")
 }
 
 /// TEST-specific filtering + stack trace truncation.

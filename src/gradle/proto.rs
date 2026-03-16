@@ -1,6 +1,8 @@
 /// Returns true if the task name is a proto generation task.
+/// Case-insensitive via internal lowercasing.
 pub fn matches_task(task_name: &str) -> bool {
-    task_name == "buildProtos" || task_name == "generateProtos" || task_name.contains("Proto")
+    let t = task_name.to_ascii_lowercase();
+    t == "buildprotos" || t == "generateprotos" || t.contains("proto")
 }
 
 /// PROTO error filtering.

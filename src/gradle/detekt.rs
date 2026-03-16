@@ -1,6 +1,7 @@
 /// Returns true if the task name is a detekt task.
+/// Case-insensitive via internal lowercasing.
 pub fn matches_task(task_name: &str) -> bool {
-    task_name.starts_with("detekt")
+    task_name.to_ascii_lowercase().starts_with("detekt")
 }
 
 /// DETEKT violation grouping.
