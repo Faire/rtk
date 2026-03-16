@@ -1,0 +1,42 @@
+Starting Gradle Daemon...
+Gradle Daemon started in 1854 ms
+> Configure project :
+> Configure project :app-billing
+> Configure project :app-payments
+Calculating task graph as no cached configuration is available for tasks: :app-payments:test
+> Task :app-common:compileKotlin UP-TO-DATE
+> Task :app-common:compileJava NO-SOURCE
+> Task :app-common:processResources UP-TO-DATE
+> Task :app-common:classes UP-TO-DATE
+> Task :app-common:jar UP-TO-DATE
+> Task :app-payments:compileKotlin UP-TO-DATE
+> Task :app-payments:compileJava NO-SOURCE
+> Task :app-payments:processResources UP-TO-DATE
+> Task :app-payments:classes UP-TO-DATE
+> Task :app-payments:compileTestKotlin UP-TO-DATE
+> Task :app-payments:compileTestJava NO-SOURCE
+> Task :app-payments:processTestResources UP-TO-DATE
+> Task :app-payments:testClasses UP-TO-DATE
+Discovering tests in :app-payments:test
+Starting test execution for :app-payments:test
+Gradle Test Executor 1 started executing tests.
+> Task :app-payments:test
+com.example.payments.PaymentsServiceTest > testChargeAmount PASSED
+com.example.payments.PaymentsServiceTest > testRefundAmount PASSED
+com.example.payments.PaymentsServiceTest > testPartialRefund PASSED
+com.example.payments.PaymentsServiceTest > testInvalidAmount PASSED
+com.example.payments.helpers.PaymentAssertionsTest > testAssertChargeAmount PASSED
+com.example.payments.helpers.PaymentAssertionsTest > testAssertRefundAmount PASSED
+com.example.payments.processing.ChargeProcessorTest > testProcess PASSED
+com.example.payments.processing.ChargeProcessorTest > testProcessWithRetry PASSED
+com.example.payments.processing.ChargeProcessorTest > testProcessWithFailure PASSED
+
+9 tests completed, 0 failed
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they are coming from your own scripts or plugins.
+Publishing build scan...
+https://develocity.example.com/s/abc123xyz
+
+BUILD SUCCESSFUL in 8s
+12 actionable tasks: 1 executed, 11 up-to-date
