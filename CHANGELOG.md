@@ -5,6 +5,23 @@ All notable changes to rtk (Rust Token Killer) will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Features
+
+* **gradle**: Add `rtk gradle` command for filtered Gradle output (85-99% token savings)
+  - Task-type auto-detection: COMPILE, TEST, DETEKT, HEALTH, PROTO, DEPS, GENERIC
+  - Global noise filters: daemon startup, task status, config cache, deprecation, downloads, build scan, etc.
+  - COMPILE filter: kapt/KSP noise removal, path normalization (absolute → relative)
+  - TEST filter: passing test removal, stack trace truncation (keep exception + assertion + user frames)
+  - DETEKT filter: violation grouping by rule (>3 same rule → grouped format)
+  - HEALTH filter: passthrough (already concise)
+  - PROTO filter: proto error extraction
+  - DEPS filter: dependency tree depth truncation (keep depth 0-1)
+  - Multi-task batch: per-task section splitting and filtering
+  - Configurable via `[gradle]` section in config.toml: `user_packages`, `extra_drop_patterns`
+  - Hook integration: `./gradlew` and `gradle` commands auto-rewrite to `rtk gradle`
+
 ## [0.29.0](https://github.com/rtk-ai/rtk/compare/v0.28.2...v0.29.0) (2026-03-12)
 
 
