@@ -1,0 +1,47 @@
+Starting Gradle Daemon...
+Gradle Daemon started in 1854 ms
+> Configure project :
+> Configure project :app-billing
+> Configure project :app-payments
+Calculating task graph as no cached configuration is available for tasks: :app-payments:compileKotlin
+> Task :app-common:compileKotlin UP-TO-DATE
+> Task :app-common:compileJava NO-SOURCE
+> Task :app-common:processResources UP-TO-DATE
+> Task :app-common:classes UP-TO-DATE
+> Task :app-common:jar UP-TO-DATE
+> Task :app-payments:kaptGenerateStubsKotlin
+w: /Users/developer/backend/app-payments/src/main/kotlin/com/example/payments/internal/ProcessorFactory.kt:12:5 'inject' is deprecated. Use constructor injection instead.
+> Task :app-payments:kaptKotlin
+Annotation processing was successful. Generated 42 files.
+> Task :app-payments:compileKotlin FAILED
+e: /Users/developer/backend/app-payments/src/main/kotlin/com/example/payments/Foo.kt:42:5 Unresolved reference: Bar
+   val x: Bar = TODO()
+       ^
+e: /Users/developer/backend/app-payments/src/main/kotlin/com/example/payments/Foo.kt:55:10 Type mismatch: expected String, got Int
+   fun process(): String = computeValue()
+                           ^
+w: /Users/developer/backend/app-payments/src/main/kotlin/com/example/payments/legacy/OldService.kt:8:1 Parameter 'unused' is never used
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+Kotlin compile daemon is already running; skipping startup
+Connected to the daemon on port 12345
+Incremental compilation was started but abandoned because of changes in the classpath
+Performing full compilation as incremental compilation is not supported for this build configuration
+Resource processing completed in 250ms
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they are coming from your own scripts or plugins.
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app-payments:compileKotlin'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 5s
+6 actionable tasks: 2 executed, 4 up-to-date

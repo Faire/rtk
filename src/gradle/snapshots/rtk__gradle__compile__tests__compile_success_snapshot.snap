@@ -1,0 +1,6 @@
+---
+source: src/gradle/compile.rs
+expression: output
+---
+BUILD SUCCESSFUL in 12s
+8 actionable tasks: 1 executed, 7 up-to-date
