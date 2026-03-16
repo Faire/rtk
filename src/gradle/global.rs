@@ -27,8 +27,6 @@ lazy_static! {
         Regex::new(r"^(Publishing build scan|https://develocity\.|Upload .* build scan|Waiting for build scan)").unwrap(),
         // VFS (all VFS> lines and Virtual file system lines)
         Regex::new(r"^(VFS>|Virtual file system )").unwrap(),
-        // Focus plugin messages (matched after ANSI stripping)
-        Regex::new(r"This task referenced \d+ projects|Learn more about how you can focus").unwrap(),
         // Evaluation
         Regex::new(r"^(Evaluating root project|All projects evaluated|Settings evaluated)").unwrap(),
         // Classpath
@@ -41,13 +39,14 @@ lazy_static! {
         Regex::new(r"^Received \d+ file system events").unwrap(),
         // AWS SSO / authentication warnings (common in CI/dev environments)
         Regex::new(r"^aws: \[ERROR\]|^.*AWS CLI is not authenticated").unwrap(),
+        // Javac/kapt notes (not actionable)
+        Regex::new(r"^Note: ").unwrap(),
     ];
 }
 
 /// Apply global noise filters to gradle output.
 ///
-/// Drops noise lines, removes `* Try:` blocks, deduplicates Note/warning lines,
-/// and trims blank lines.
+/// Drops noise lines, removes `* Try:` blocks, and trims blank lines.
 pub fn apply_global_filters(input: &str) -> String {
     let config = load_extra_patterns();
     apply_global_filters_with_extras(input, &config)
@@ -79,7 +78,6 @@ pub fn compile_extra_patterns(patterns: &[String]) -> Vec<Regex> {
 pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -> String {
     let mut result = Vec::new();
     let mut in_try_block = false;
-    let mut seen_notes: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     for line in input.lines() {
         let trimmed = line.trim();
@@ -123,13 +121,6 @@ pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -
                 result.push(String::new());
             }
             continue;
-        }
-
-        // Note/warning deduplication (use clean text for comparison)
-        if clean_trimmed.starts_with("Note:") || clean_trimmed.starts_with("warning:") {
-            if !seen_notes.insert(clean_trimmed.to_string()) {
-                continue;
-            }
         }
 
         // Check against built-in noise patterns (use ANSI-stripped text)
@@ -235,11 +226,11 @@ mod tests {
     }
 
     #[test]
-    fn test_note_deduplication() {
-        let input = "Note: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nNote: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.";
+    fn test_note_lines_dropped() {
+        let input = "Note: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nBUILD SUCCESSFUL in 1s";
         let output = apply_global_filters_with_extras(input, &[]);
-        let note_count = output.lines().filter(|l| l.starts_with("Note:")).count();
-        assert_eq!(note_count, 2, "Each unique Note should appear exactly once");
+        assert!(!output.contains("Note:"), "Note: lines should be dropped");
+        assert!(output.contains("BUILD SUCCESSFUL"));
     }
 
     #[test]
