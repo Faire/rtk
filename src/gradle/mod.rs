@@ -159,7 +159,30 @@ fn normalize_args(args: &[String]) -> Vec<String> {
     result
 }
 
+/// Verbose logging flags that produce massive output (10-100x tokens).
+/// Reject these and tell the user to run gradle directly.
+const VERBOSE_FLAGS: &[&str] = &["--info", "--debug", "-d", "--stacktrace", "-s"];
+
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
+    // Reject verbose flags — the output is enormous and not filterable
+    if let Some(flag) = args.iter().find(|a| VERBOSE_FLAGS.contains(&a.as_str())) {
+        let gradle = find_gradle_executable();
+        eprintln!(
+            "rtk: refusing to filter `{} {}` — {} produces 10-100x more output, \
+             overwhelming token budgets. Run directly:\n\n  {} {}",
+            flag,
+            args.iter()
+                .filter(|a| !VERBOSE_FLAGS.contains(&a.as_str()))
+                .next()
+                .map(|s| s.as_str())
+                .unwrap_or("..."),
+            flag,
+            gradle,
+            args.join(" ")
+        );
+        std::process::exit(1);
+    }
+
     let timer = tracking::TimedExecution::start();
 
     let gradle = find_gradle_executable();
@@ -440,6 +463,33 @@ mod tests {
         assert_eq!(
             result,
             vec!["--continue", ":app:test", "--info", "--console", "plain"]
+        );
+    }
+
+    // --- verbose flag rejection tests ---
+
+    #[test]
+    fn test_verbose_flags_detected() {
+        for flag in VERBOSE_FLAGS {
+            let args = vec![":app:test".to_string(), flag.to_string()];
+            assert!(
+                args.iter().any(|a| VERBOSE_FLAGS.contains(&a.as_str())),
+                "{} should be detected as verbose",
+                flag
+            );
+        }
+    }
+
+    #[test]
+    fn test_normal_flags_not_rejected() {
+        let args = vec![
+            "--continue".to_string(),
+            ":app:test".to_string(),
+            "--no-daemon".to_string(),
+        ];
+        assert!(
+            !args.iter().any(|a| VERBOSE_FLAGS.contains(&a.as_str())),
+            "normal flags should not be rejected"
         );
     }
 
