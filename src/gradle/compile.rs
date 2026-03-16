@@ -43,6 +43,12 @@ mod tests {
     }
 
     #[test]
+    fn test_matches_android_variant_compile() {
+        assert!(matches_task("compileDebugKotlin"));
+        assert!(matches_task("compileReleaseJava"));
+    }
+
+    #[test]
     fn test_no_match_test() {
         assert!(!matches_task("test"));
     }
