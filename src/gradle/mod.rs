@@ -138,27 +138,31 @@ fn find_gradle_executable() -> String {
     "gradle".to_string()
 }
 
-/// Normalize gradle args in one pass: strip `--quiet`/`-q` (suppresses
-/// parseable output) and inject `--console plain` if not already present.
+/// Normalize gradle args in one pass:
+/// - Strip `--quiet`/`-q` (suppresses parseable output)
+/// - Force `--console plain` (strip any existing `--console` and re-add as plain)
 fn normalize_args(args: &[String]) -> Vec<String> {
     let mut result = Vec::with_capacity(args.len() + 2);
-    let mut has_console = false;
+    let mut skip_next = false;
 
     for arg in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
         match arg.as_str() {
             "--quiet" | "-q" => continue,
-            "--console" => has_console = true,
-            s if s.starts_with("--console=") => has_console = true,
-            _ => {}
+            "--console" => {
+                skip_next = true; // skip the following value (e.g. "rich")
+                continue;
+            }
+            s if s.starts_with("--console=") => continue,
+            _ => result.push(arg.clone()),
         }
-        result.push(arg.clone());
     }
 
-    if !has_console {
-        result.push("--console".to_string());
-        result.push("plain".to_string());
-    }
-
+    result.push("--console".to_string());
+    result.push("plain".to_string());
     result
 }
 
@@ -424,21 +428,28 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_keeps_existing_console() {
+    fn test_normalize_overrides_console_rich() {
         let args = vec![
             "--console".to_string(),
             "rich".to_string(),
             ":app:test".to_string(),
         ];
         let result = normalize_args(&args);
-        assert_eq!(result, args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     #[test]
-    fn test_normalize_keeps_console_equals() {
+    fn test_normalize_overrides_console_equals_rich() {
+        let args = vec!["--console=rich".to_string(), ":app:test".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_overrides_console_equals_plain() {
         let args = vec!["--console=plain".to_string(), ":app:test".to_string()];
         let result = normalize_args(&args);
-        assert_eq!(result, args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     #[test]
