@@ -16,7 +16,6 @@ use std::process::Command;
 pub enum TaskType {
     Compile,
     Test,
-    IntegrationTest,
     Detekt,
     Health,
     Proto,
@@ -25,14 +24,9 @@ pub enum TaskType {
 }
 
 /// Registry of task type matchers, checked in priority order.
-/// Integration test must precede test (test is an exact match that would shadow it).
 const TASK_TYPE_REGISTRY: &[(fn(&str) -> bool, TaskType)] = &[
     (deps::matches_task, TaskType::Deps),
-    (
-        test_filter::matches_integration_task,
-        TaskType::IntegrationTest,
-    ),
-    (test_filter::matches_test_task, TaskType::Test),
+    (test_filter::matches_task, TaskType::Test),
     (detekt::matches_task, TaskType::Detekt),
     (health::matches_task, TaskType::Health),
     (compile::matches_task, TaskType::Compile),
@@ -77,6 +71,54 @@ pub fn detect_task_type(args: &[String]) -> TaskType {
         1 => detected.into_iter().next().unwrap_or(TaskType::Generic),
         _ => TaskType::Generic, // Multiple distinct task types → batch handles routing
     }
+}
+
+/// Refine a Generic task type by scanning raw output for `> Task :...:taskName` lines.
+///
+/// Handles meta-tasks (like `check`, `build`, `lint`) that delegate to specific tasks.
+/// If output reveals a single task type, returns that type; otherwise keeps Generic.
+pub fn detect_task_type_from_output(raw: &str) -> TaskType {
+    use lazy_static::lazy_static;
+    use regex::Regex;
+
+    lazy_static! {
+        static ref TASK_LINE: Regex = Regex::new(r"^> Task :(?:[^:]+:)*([^\s]+)").unwrap();
+    }
+
+    let mut detected: Vec<TaskType> = Vec::new();
+
+    for line in raw.lines() {
+        if let Some(caps) = TASK_LINE.captures(line.trim()) {
+            let task_name = caps.get(1).map_or("", |m| m.as_str());
+
+            let task_type = TASK_TYPE_REGISTRY
+                .iter()
+                .find(|(matcher, _)| matcher(task_name))
+                .map(|(_, tt)| tt.clone());
+
+            if let Some(tt) = task_type {
+                if !detected.iter().any(|d| d == &tt) {
+                    detected.push(tt);
+                }
+            }
+        }
+    }
+
+    match detected.len() {
+        1 => detected.into_iter().next().unwrap_or(TaskType::Generic),
+        _ => TaskType::Generic, // 0 or multiple types → keep Generic
+    }
+}
+
+/// Returns true if any of the given args refer to an integration/component/instrumented test task.
+pub fn is_integration_test(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        let task_name = match arg.rfind(':') {
+            Some(pos) => &arg[pos + 1..],
+            None => arg.as_str(),
+        };
+        test_filter::is_integration_task_name(task_name)
+    })
 }
 
 /// Find the gradle executable: prefer ./gradlew walking up parent dirs, fall back to gradle on PATH.
@@ -133,8 +175,13 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     let raw = format!("{}\n{}", stdout, stderr);
 
-    let task_type = detect_task_type(args);
-    let filtered = filter_gradle_output(&raw, &task_type);
+    let mut task_type = detect_task_type(args);
+    // Fallback: if args didn't reveal a task type, scan output for executed tasks
+    if task_type == TaskType::Generic {
+        task_type = detect_task_type_from_output(&raw);
+    }
+    let is_integration = is_integration_test(args);
+    let filtered = filter_gradle_output(&raw, &task_type, is_integration);
 
     let exit_code = output
         .status
@@ -167,15 +214,13 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 }
 
 /// Apply task-type-specific filtering to gradle output.
-pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
+pub fn filter_gradle_output(raw: &str, task_type: &TaskType, is_integration: bool) -> String {
     // For now, pass through with just global filters (will be enhanced in later commits)
     let filtered = global::apply_global_filters(raw);
 
     match task_type {
         TaskType::Compile => compile::filter_compile(&filtered),
-        TaskType::Test | TaskType::IntegrationTest => {
-            test_filter::filter_test(&filtered, task_type == &TaskType::IntegrationTest)
-        }
+        TaskType::Test => test_filter::filter_test(&filtered, is_integration),
         TaskType::Detekt => detekt::filter_detekt(&filtered),
         TaskType::Health => health::filter_health(&filtered),
         TaskType::Proto => proto::filter_proto(&filtered),
@@ -223,13 +268,13 @@ mod tests {
     #[test]
     fn test_detect_integration_test() {
         let args = vec![":app:billing:integrationTest".to_string()];
-        assert_eq!(detect_task_type(&args), TaskType::IntegrationTest);
+        assert_eq!(detect_task_type(&args), TaskType::Test);
     }
 
     #[test]
     fn test_detect_component_test() {
         let args = vec![":app:billing:componentTest".to_string()];
-        assert_eq!(detect_task_type(&args), TaskType::IntegrationTest);
+        assert_eq!(detect_task_type(&args), TaskType::Test);
     }
 
     #[test]
@@ -344,5 +389,64 @@ mod tests {
         let args = vec!["--console=plain".to_string(), ":app:test".to_string()];
         let result = ensure_console_plain(&args);
         assert_eq!(result, args);
+    }
+
+    // --- detect_task_type_from_output tests ---
+
+    #[test]
+    fn test_output_detection_finds_test() {
+        let output = "> Task :app:billing:processResources UP-TO-DATE\n> Task :app:billing:test\n> Task :app:billing:test FAILED";
+        assert_eq!(detect_task_type_from_output(output), TaskType::Test);
+    }
+
+    #[test]
+    fn test_output_detection_finds_detekt() {
+        let output = "> Task :app:billing:detektMain\n> Task :app:billing:detektTest";
+        assert_eq!(detect_task_type_from_output(output), TaskType::Detekt);
+    }
+
+    #[test]
+    fn test_output_detection_multiple_types_returns_generic() {
+        let output = "> Task :app:billing:test\n> Task :app:billing:detektMain";
+        assert_eq!(detect_task_type_from_output(output), TaskType::Generic);
+    }
+
+    #[test]
+    fn test_output_detection_no_tasks_returns_generic() {
+        let output = "BUILD SUCCESSFUL in 5s";
+        assert_eq!(detect_task_type_from_output(output), TaskType::Generic);
+    }
+
+    #[test]
+    fn test_output_detection_ignores_compile_when_test_present() {
+        // Compile tasks are common prerequisites — if test tasks also appear,
+        // both types are detected → Generic (batch handles routing)
+        let output = "> Task :app:compileKotlin\n> Task :app:test";
+        // Two distinct types → Generic
+        assert_eq!(detect_task_type_from_output(output), TaskType::Generic);
+    }
+
+    // --- is_integration_test tests ---
+
+    #[test]
+    fn test_is_integration_test_positive() {
+        let args = vec![":app:billing:integrationTest".to_string()];
+        assert!(is_integration_test(&args));
+    }
+
+    #[test]
+    fn test_is_integration_test_negative() {
+        let args = vec![":app:billing:test".to_string()];
+        assert!(!is_integration_test(&args));
+    }
+
+    #[test]
+    fn test_is_integration_test_mixed_args() {
+        let args = vec![
+            "--continue".to_string(),
+            ":app:billing:integrationTest".to_string(),
+            "--info".to_string(),
+        ];
+        assert!(is_integration_test(&args));
     }
 }

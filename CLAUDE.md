@@ -228,6 +228,7 @@ rtk gain --history | grep proxy
 | pytest_cmd.rs | Pytest test runner | State machine text parser (90%+ reduction) |
 | mypy_cmd.rs | Mypy type checker | Group by file/error code (80% reduction) |
 | pip_cmd.rs | pip/uv package manager | JSON parsing, auto-detect uv (70-85% reduction) |
+| gradle/ | Gradle commands | Task-type detection, global noise filters, compile/test/detekt/health/proto/deps/batch (85-99% reduction) |
 | go_cmd.rs | Go commands | NDJSON for test, text for build/vet (80-90% reduction) |
 | golangci_cmd.rs | golangci-lint | JSON parsing, group by rule (85% reduction) |
 | tee.rs | Full output recovery | Save raw output to file on failure, print hint for LLM re-read |
