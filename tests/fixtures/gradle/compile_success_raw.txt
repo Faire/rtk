@@ -74,6 +74,6 @@ VFS> > FileHasher: Hashed 28944 files (390031618 bytes)
 VFS> > DirectorySnapshotter: Snapshot 7069 directory hierarchies (visited 27458 directories, 175521 files and 0 failed files)
 
 Publishing build scan...
-https://develocity.example.com/s/fagmceoq32cxc
+https://scans.gradle.com/s/fagmceoq32cxc
 
 Configuration cache entry stored.
