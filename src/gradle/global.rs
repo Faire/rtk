@@ -1,3 +1,4 @@
+use crate::utils::strip_ansi;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -26,8 +27,8 @@ lazy_static! {
         Regex::new(r"^(Publishing build scan|https://develocity\.|Upload .* build scan|Waiting for build scan)").unwrap(),
         // VFS (all VFS> lines and Virtual file system lines)
         Regex::new(r"^(VFS>|Virtual file system )").unwrap(),
-        // Focus plugin messages (ANSI colored or plain)
-        Regex::new(r"This task referenced \d+ projects|Learn more about how you can focus|^\[33m|^\[0m$").unwrap(),
+        // Focus plugin messages (matched after ANSI stripping)
+        Regex::new(r"This task referenced \d+ projects|Learn more about how you can focus").unwrap(),
         // Evaluation
         Regex::new(r"^(Evaluating root project|All projects evaluated|Settings evaluated)").unwrap(),
         // Classpath
@@ -40,8 +41,6 @@ lazy_static! {
         Regex::new(r"^Received \d+ file system events").unwrap(),
         // AWS SSO / authentication warnings (common in CI/dev environments)
         Regex::new(r"^aws: \[ERROR\]|^.*AWS CLI is not authenticated").unwrap(),
-        // ANSI escape sequences (bare color codes on their own line)
-        Regex::new(r"^\x1b\[\d+m\s*$").unwrap(),
     ];
 }
 
@@ -84,10 +83,38 @@ pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -
 
     for line in input.lines() {
         let trimmed = line.trim();
+        // Strip ANSI escape codes for pattern matching (but keep original line for output)
+        let clean = strip_ansi(trimmed);
+        let clean_trimmed = clean.trim();
 
-        // Skip empty lines at this stage (we trim later)
-        // but track them for blank line collapsing
-        if trimmed.is_empty() {
+        // Try block removal: "* Try:" through next "* " header or end of block
+        // Must be checked before blank line handling so blank lines inside Try blocks are consumed
+        if clean_trimmed.starts_with("* Try:") {
+            in_try_block = true;
+            continue;
+        }
+        if in_try_block {
+            if clean_trimmed.is_empty() {
+                // Blank lines inside Try block — consume
+                continue;
+            } else if clean_trimmed.starts_with("* ") {
+                // Next * header ends the Try block
+                in_try_block = false;
+                // Fall through to process this line normally
+            } else if clean_trimmed.starts_with("> ")
+                || clean_trimmed.starts_with("Get more help at")
+            {
+                // Indented content within Try block
+                continue;
+            } else {
+                // Non-Try-block content — end the block
+                in_try_block = false;
+                // Fall through to process this line normally
+            }
+        }
+
+        // Skip empty lines (blank line collapsing)
+        if clean_trimmed.is_empty() {
             // Only add blank if last line wasn't blank
             if result
                 .last()
@@ -98,40 +125,25 @@ pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -
             continue;
         }
 
-        // Try block removal: "* Try:" through next "* " header or end of block
-        if trimmed.starts_with("* Try:") {
-            in_try_block = true;
+        // Note/warning deduplication (use clean text for comparison)
+        if clean_trimmed.starts_with("Note:") || clean_trimmed.starts_with("warning:") {
+            if !seen_notes.insert(clean_trimmed.to_string()) {
+                continue;
+            }
+        }
+
+        // Check against built-in noise patterns (use ANSI-stripped text)
+        if NOISE_PATTERNS.iter().any(|re| re.is_match(clean_trimmed)) {
             continue;
         }
-        if in_try_block {
-            if trimmed.starts_with("* ") {
-                // Next * header ends the Try block
-                in_try_block = false;
-                // Fall through to process this line normally
-            } else if trimmed.starts_with("> ") || trimmed.starts_with("Get more help at") {
-                // Indented content within Try block
-                continue;
-            } else {
-                // Non-Try-block content — end the block
-                in_try_block = false;
-                // Fall through to process this line normally
-            }
-        }
 
-        // Note/warning deduplication
-        if trimmed.starts_with("Note:") || trimmed.starts_with("warning:") {
-            if !seen_notes.insert(trimmed.to_string()) {
-                continue;
-            }
-        }
-
-        // Check against built-in noise patterns
-        if NOISE_PATTERNS.iter().any(|re| re.is_match(trimmed)) {
+        // Drop lines that are only ANSI escape codes (no visible content after stripping)
+        if clean_trimmed.is_empty() && !trimmed.is_empty() {
             continue;
         }
 
         // Check against extra user-supplied patterns
-        if extra_patterns.iter().any(|re| re.is_match(trimmed)) {
+        if extra_patterns.iter().any(|re| re.is_match(clean_trimmed)) {
             continue;
         }
 
