@@ -47,16 +47,9 @@ com.example.payments.integration.PaymentFlowIntegrationTest > testChargeWithInva
             ... 8 more
 
 com.example.payments.integration.PaymentFlowIntegrationTest STANDARD_OUT
-    2025-01-15 10:30:00.000 INFO  --- [main] o.h.jpa.internal.util.LogHelper : HHH000204: Processing PersistenceUnitInfo [name: default]
-    2025-01-15 10:30:00.100 INFO  --- [main] org.hibernate.Version : HHH000412: Hibernate ORM core version 5.6.14.Final
-    2025-01-15 10:30:00.200 INFO  --- [main] o.h.annotations.common.Version : HCANN000001: Hibernate Commons Annotations {5.1.2.Final}
-    2025-01-15 10:30:00.300 INFO  --- [main] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Starting...
-    2025-01-15 10:30:00.400 INFO  --- [main] com.zaxxer.hikari.HikariDataSource : HikariPool-1 - Start completed.
-    2025-01-15 10:30:00.500 INFO  --- [main] o.s.b.a.e.web.EndpointLinksResolver : Exposing 2 endpoint(s) beneath base path '/actuator'
-    2025-01-15 10:30:01.000 INFO  --- [main] o.t.utility.ImageNameSubstitutor : Image name substitution will be performed by: DefaultImageNameSubstitutor
-    2025-01-15 10:30:01.100 INFO  --- [main] o.t.d.DockerClientProviderStrategy : Found Docker environment
-    2025-01-15 10:30:02.000 INFO  --- [main] o.s.t.c.support.AbstractContextLoader : Initializing Spring context
-    2025-01-15 10:30:03.000 INFO  --- [main] org.springframework.boot.test.context.SpringBootTestContextBootstrapper : Starting test context bootstrapper
+    2025-01-15 10:30:00.000 INFO  [main] c.e.p.i.PaymentFlowIntegrationTest : Setting up test payment provider
+    2025-01-15 10:30:00.100 INFO  [main] c.e.p.i.PaymentFlowIntegrationTest : Creating test customer with card ending 4242
+    2025-01-15 10:30:00.200 DEBUG [main] c.e.p.CardValidator : Validating card number: ****4242
 
 > Task :app-payments:integrationTest FAILED
 

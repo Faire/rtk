@@ -60,7 +60,7 @@ lazy_static! {
     // Stack trace frame classification patterns
     static ref USER_CODE: Regex = Regex::new(r"^\s+at com\.example\.").unwrap();
     static ref ASSERTION_FRAME: Regex = Regex::new(
-        r"^\s+at (org\.junit\.Assert|org\.assertj|kotlin\.test|org\.junit\.jupiter\.api\.Assertion|org\.opentest4j\.)"
+        r"^\s+at (org\.junit\.Assert|org\.assertj\.core\.api\.|kotlin\.test|org\.junit\.jupiter\.api\.Assertion|org\.opentest4j\.)"
     ).unwrap();
     static ref CAUSED_BY: Regex = Regex::new(r"^\s+(Caused by:|Suppressed:)").unwrap();
     static ref FRAME_LINE: Regex = Regex::new(r"^\s+at ").unwrap();

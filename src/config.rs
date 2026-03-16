@@ -125,6 +125,7 @@ pub fn default_drop_frame_packages() -> Vec<String> {
         "org.mockito".to_string(),
         "io.mockk".to_string(),
         "org.eclipse.jetty".to_string(),
+        "org.assertj.core.internal".to_string(),
     ]
 }
 
