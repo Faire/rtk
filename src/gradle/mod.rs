@@ -138,26 +138,85 @@ fn find_gradle_executable() -> String {
     "gradle".to_string()
 }
 
-/// Inject `--console plain` if not already present in args.
-fn ensure_console_plain(args: &[String]) -> Vec<String> {
-    let has_console = args
-        .iter()
-        .any(|a| a == "--console" || a.starts_with("--console="));
-    if has_console {
-        args.to_vec()
-    } else {
-        let mut result = args.to_vec();
-        result.push("--console".to_string());
-        result.push("plain".to_string());
-        result
+/// Normalize gradle args in one pass:
+/// - Strip `--quiet`/`-q` (suppresses parseable output)
+/// - Append `--console plain` (caller must reject non-plain `--console` before this)
+fn normalize_args(args: &[String]) -> Vec<String> {
+    let mut result = Vec::with_capacity(args.len() + 2);
+
+    for arg in args {
+        match arg.as_str() {
+            "--quiet" | "-q" => continue,
+            _ => result.push(arg.clone()),
+        }
     }
+
+    result.push("--console".to_string());
+    result.push("plain".to_string());
+    result
+}
+
+/// Verbose logging flags that produce massive output (10-100x tokens).
+/// Reject these and tell the user to run gradle directly.
+const VERBOSE_FLAGS: &[&str] = &["--info", "--debug", "-d"];
+
+/// Check if args contain a `--console` value that isn't `plain`.
+/// Returns the non-plain value if found.
+fn find_non_plain_console(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--console" {
+            if let Some(val) = iter.next() {
+                if val != "plain" {
+                    return Some(format!("--console {}", val));
+                }
+            }
+        } else if let Some(val) = arg.strip_prefix("--console=") {
+            if val != "plain" {
+                return Some(arg.clone());
+            }
+        }
+    }
+    None
 }
 
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
+    // Reject non-plain --console — rtk needs parseable output
+    if let Some(console_arg) = find_non_plain_console(args) {
+        let gradle = find_gradle_executable();
+        eprintln!(
+            "rtk: `{}` is incompatible with filtering — rtk requires `--console plain`. \
+             Either remove the flag or run directly:\n\n  {} {}",
+            console_arg,
+            gradle,
+            args.join(" ")
+        );
+        std::process::exit(1);
+    }
+
+    // Reject verbose flags — the output is enormous and not filterable
+    if let Some(flag) = args.iter().find(|a| VERBOSE_FLAGS.contains(&a.as_str())) {
+        let gradle = find_gradle_executable();
+        eprintln!(
+            "rtk: refusing to filter `{} {}` — {} produces 10-100x more output, \
+             overwhelming token budgets. Run directly:\n\n  {} {}",
+            flag,
+            args.iter()
+                .filter(|a| !VERBOSE_FLAGS.contains(&a.as_str()))
+                .next()
+                .map(|s| s.as_str())
+                .unwrap_or("..."),
+            flag,
+            gradle,
+            args.join(" ")
+        );
+        std::process::exit(1);
+    }
+
     let timer = tracking::TimedExecution::start();
 
     let gradle = find_gradle_executable();
-    let full_args = ensure_console_plain(args);
+    let full_args = normalize_args(args);
 
     if verbose > 0 {
         eprintln!("Running: {} {}", gradle, full_args.join(" "));
@@ -377,40 +436,122 @@ mod tests {
 
     // --- ensure_console_plain tests ---
 
+    // --- normalize_args tests ---
+
     #[test]
-    fn test_console_plain_injected_when_missing() {
+    fn test_normalize_injects_console_plain() {
         let args = vec![":app:test".to_string()];
-        let result = ensure_console_plain(&args);
+        let result = normalize_args(&args);
         assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     #[test]
-    fn test_console_plain_not_duplicated() {
+    fn test_normalize_appends_console_plain() {
+        // --console plain is always appended (caller rejects non-plain before normalize)
+        let args = vec![":app:test".to_string(), "--continue".to_string()];
+        let result = normalize_args(&args);
+        assert!(result.ends_with(&["--console".to_string(), "plain".to_string()]));
+    }
+
+    // --- find_non_plain_console tests ---
+
+    #[test]
+    fn test_rejects_console_rich() {
         let args = vec![
             "--console".to_string(),
             "rich".to_string(),
             ":app:test".to_string(),
         ];
-        let result = ensure_console_plain(&args);
-        assert_eq!(result, args);
+        assert_eq!(
+            find_non_plain_console(&args),
+            Some("--console rich".to_string())
+        );
     }
 
     #[test]
-    fn test_console_plain_already_plain_not_duplicated() {
+    fn test_rejects_console_equals_auto() {
+        let args = vec!["--console=auto".to_string(), ":app:test".to_string()];
+        assert_eq!(
+            find_non_plain_console(&args),
+            Some("--console=auto".to_string())
+        );
+    }
+
+    #[test]
+    fn test_accepts_console_plain() {
         let args = vec![
             "--console".to_string(),
             "plain".to_string(),
             ":app:test".to_string(),
         ];
-        let result = ensure_console_plain(&args);
-        assert_eq!(result, args);
+        assert_eq!(find_non_plain_console(&args), None);
     }
 
     #[test]
-    fn test_console_equals_form_not_duplicated() {
+    fn test_accepts_console_equals_plain() {
         let args = vec!["--console=plain".to_string(), ":app:test".to_string()];
-        let result = ensure_console_plain(&args);
-        assert_eq!(result, args);
+        assert_eq!(find_non_plain_console(&args), None);
+    }
+
+    #[test]
+    fn test_accepts_no_console_flag() {
+        let args = vec![":app:test".to_string()];
+        assert_eq!(find_non_plain_console(&args), None);
+    }
+
+    #[test]
+    fn test_normalize_strips_quiet_long() {
+        let args = vec!["--quiet".to_string(), ":app:test".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_strips_quiet_short() {
+        let args = vec!["-q".to_string(), ":app:test".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_preserves_other_flags() {
+        let args = vec![
+            "--continue".to_string(),
+            ":app:test".to_string(),
+            "--info".to_string(),
+        ];
+        let result = normalize_args(&args);
+        assert_eq!(
+            result,
+            vec!["--continue", ":app:test", "--info", "--console", "plain"]
+        );
+    }
+
+    // --- verbose flag rejection tests ---
+
+    #[test]
+    fn test_verbose_flags_detected() {
+        for flag in VERBOSE_FLAGS {
+            let args = vec![":app:test".to_string(), flag.to_string()];
+            assert!(
+                args.iter().any(|a| VERBOSE_FLAGS.contains(&a.as_str())),
+                "{} should be detected as verbose",
+                flag
+            );
+        }
+    }
+
+    #[test]
+    fn test_normal_flags_not_rejected() {
+        let args = vec![
+            "--continue".to_string(),
+            ":app:test".to_string(),
+            "--no-daemon".to_string(),
+        ];
+        assert!(
+            !args.iter().any(|a| VERBOSE_FLAGS.contains(&a.as_str())),
+            "normal flags should not be rejected"
+        );
     }
 
     // --- detect_task_type_from_output tests ---
