@@ -23,8 +23,8 @@ lazy_static! {
         // Downloads + progress bars
         Regex::new(r"^(Download |Downloading )").unwrap(),
         Regex::new(r"^\s*\[[\s<=\->]+\]\s+\d+%").unwrap(),
-        // Build scan + develocity URLs
-        Regex::new(r"^(Publishing build scan|https://develocity\.|Upload .* build scan|Waiting for build scan)").unwrap(),
+        // Build scan + develocity URLs (both private develocity.* and public scans.gradle.com)
+        Regex::new(r"^(Publishing build scan|https://(develocity\.|scans\.gradle\.com)|Upload .* build scan|Waiting for build scan)").unwrap(),
         // VFS (all VFS> lines and Virtual file system lines)
         Regex::new(r"^(VFS>|Virtual file system )").unwrap(),
         // Evaluation

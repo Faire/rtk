@@ -60,6 +60,6 @@ Received 747 file system events during the current build while watching 1 locati
 Virtual file system retains information about 160976 files, 24516 directories and 3917 missing files until next build
 
 Publishing build scan...
-https://develocity.example.com/s/sosb6c6chrio6
+https://scans.gradle.com/s/sosb6c6chrio6
 
 Configuration cache entry stored.
