@@ -75,18 +75,25 @@ pub fn detect_task_type(args: &[String]) -> TaskType {
 
     match detected.len() {
         0 => TaskType::Generic,
-        1 => detected.into_iter().next().unwrap(),
+        1 => detected.into_iter().next().unwrap_or(TaskType::Generic),
         _ => TaskType::Generic, // Multiple distinct task types → batch handles routing
     }
 }
 
-/// Find the gradle executable: prefer ./gradlew in cwd, fall back to gradle on PATH.
+/// Find the gradle executable: prefer ./gradlew walking up parent dirs, fall back to gradle on PATH.
 fn find_gradle_executable() -> String {
-    if std::path::Path::new("./gradlew").exists() {
-        "./gradlew".to_string()
-    } else {
-        "gradle".to_string()
+    let candidates = [
+        "./gradlew",
+        "../gradlew",
+        "../../gradlew",
+        "../../../gradlew",
+    ];
+    for candidate in &candidates {
+        if std::path::Path::new(candidate).exists() {
+            return candidate.to_string();
+        }
     }
+    "gradle".to_string()
 }
 
 /// Inject `--console plain` if not already present in args.
@@ -97,8 +104,9 @@ fn ensure_console_plain(args: &[String]) -> Vec<String> {
     if has_console {
         args.to_vec()
     } else {
-        let mut result = vec!["--console".to_string(), "plain".to_string()];
-        result.extend(args.iter().cloned());
+        let mut result = args.to_vec();
+        result.push("--console".to_string());
+        result.push("plain".to_string());
         result
     }
 }
@@ -301,7 +309,7 @@ mod tests {
     fn test_console_plain_injected_when_missing() {
         let args = vec![":app:test".to_string()];
         let result = ensure_console_plain(&args);
-        assert_eq!(result, vec!["--console", "plain", ":app:test"]);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     #[test]
@@ -309,6 +317,17 @@ mod tests {
         let args = vec![
             "--console".to_string(),
             "rich".to_string(),
+            ":app:test".to_string(),
+        ];
+        let result = ensure_console_plain(&args);
+        assert_eq!(result, args);
+    }
+
+    #[test]
+    fn test_console_plain_already_plain_not_duplicated() {
+        let args = vec![
+            "--console".to_string(),
+            "plain".to_string(),
             ":app:test".to_string(),
         ];
         let result = ensure_console_plain(&args);
