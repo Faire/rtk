@@ -235,7 +235,9 @@ fn collect_stack_trace(lines: &[&str], user_packages: &[String]) -> (Vec<String>
             continue;
         }
 
-        // Frame classification (classify FIRST, then check limits)
+        // Frame classification — classify first, then enforce limits.
+        // User frames are always kept (up to max_user_frames) regardless of position
+        // to avoid being shadowed by framework frames in deep traces.
         let is_user = is_user_code_frame(line, user_packages);
         let is_assertion = ASSERTION_FRAME.is_match(line);
 
@@ -256,11 +258,8 @@ fn collect_stack_trace(lines: &[&str], user_packages: &[String]) -> (Vec<String>
             // Keep first assertion frame
             result.push(line.to_string());
             assertion_kept = true;
-        } else if FRAMEWORK_FRAME.is_match(line) {
-            // Drop framework frames
-            dropped_count += 1;
         } else {
-            // Unknown frame — drop
+            // Framework/unknown frame — drop
             dropped_count += 1;
         }
     }
@@ -489,6 +488,49 @@ mod tests {
         let output = result.join("\n");
         // com.example should still be kept via the built-in USER_CODE regex
         assert!(output.contains("com.example.foo.FooTest"));
+    }
+
+    #[test]
+    fn test_non_matching_package_drops_all_user_frames() {
+        // With user_packages=["com.acme"], com.example frames become framework noise
+        let trace = vec![
+            "    java.lang.AssertionError: expected:<1> but was:<2>",
+            "        at org.junit.Assert.failNotEquals(Assert.java:834)",
+            "        at com.example.foo.FooTest.test(FooTest.kt:10)",
+            "        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
+            "",
+        ];
+        let (result, _) = collect_stack_trace(&trace, &["com.acme".to_string()]);
+        let output = result.join("\n");
+        // com.example should NOT be kept since only com.acme is configured
+        assert!(
+            !output.contains("com.example.foo.FooTest"),
+            "com.example should be treated as framework when user_packages=[com.acme]"
+        );
+        // Assertion frame and exception message should still be kept
+        assert!(output.contains("AssertionError"));
+        assert!(output.contains("org.junit.Assert.failNotEquals"));
+    }
+
+    #[test]
+    fn test_user_frames_kept_after_many_framework_frames() {
+        // Verify user frames are not dropped even if >8 framework frames precede them
+        let mut trace = vec!["    java.lang.AssertionError: test failed".to_string()];
+        for i in 0..10 {
+            trace.push(format!(
+                "        at org.junit.platform.internal.Frame{}.run(Frame.java:{})",
+                i, i
+            ));
+        }
+        trace.push("        at com.example.foo.FooTest.test(FooTest.kt:10)".to_string());
+        trace.push(String::new());
+        let trace_refs: Vec<&str> = trace.iter().map(|s| s.as_str()).collect();
+        let (result, _) = collect_stack_trace(&trace_refs, &["com.example".to_string()]);
+        let output = result.join("\n");
+        assert!(
+            output.contains("com.example.foo.FooTest.test"),
+            "User frame should be kept even after 10 framework frames"
+        );
     }
 
     #[test]
