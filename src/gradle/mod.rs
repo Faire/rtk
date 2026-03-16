@@ -161,7 +161,7 @@ fn normalize_args(args: &[String]) -> Vec<String> {
 
 /// Verbose logging flags that produce massive output (10-100x tokens).
 /// Reject these and tell the user to run gradle directly.
-const VERBOSE_FLAGS: &[&str] = &["--info", "--debug", "-d", "--stacktrace", "-s"];
+const VERBOSE_FLAGS: &[&str] = &["--info", "--debug", "-d"];
 
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
     // Reject verbose flags — the output is enormous and not filterable
