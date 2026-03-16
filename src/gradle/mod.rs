@@ -138,18 +138,21 @@ fn find_gradle_executable() -> String {
     "gradle".to_string()
 }
 
-/// Normalize gradle args: strip `--quiet`/`-q` (suppresses parseable output)
-/// and inject `--console plain` if not already present. Single allocation.
+/// Normalize gradle args in one pass: strip `--quiet`/`-q` (suppresses
+/// parseable output) and inject `--console plain` if not already present.
 fn normalize_args(args: &[String]) -> Vec<String> {
-    let has_console = args
-        .iter()
-        .any(|a| a == "--console" || a.starts_with("--console="));
+    let mut result = Vec::with_capacity(args.len() + 2);
+    let mut has_console = false;
 
-    let mut result: Vec<String> = args
-        .iter()
-        .filter(|a| a.as_str() != "--quiet" && a.as_str() != "-q")
-        .cloned()
-        .collect();
+    for arg in args {
+        match arg.as_str() {
+            "--quiet" | "-q" => continue,
+            "--console" => has_console = true,
+            s if s.starts_with("--console=") => has_console = true,
+            _ => {}
+        }
+        result.push(arg.clone());
+    }
 
     if !has_console {
         result.push("--console".to_string());
