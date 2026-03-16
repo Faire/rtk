@@ -2,5 +2,5 @@
 source: src/gradle/compile.rs
 expression: output
 ---
-BUILD SUCCESSFUL in 12s
-8 actionable tasks: 1 executed, 7 up-to-date
+BUILD SUCCESSFUL in 1m 38s
+1558 actionable tasks: 210 executed, 583 from cache, 765 up-to-date
