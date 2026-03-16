@@ -1,24 +1,27 @@
-Starting Gradle Daemon...
-Gradle Daemon started in 1854 ms
-> Configure project :
-> Configure project :app-billing
-> Configure project :app-payments
-Calculating task graph as no cached configuration is available for tasks: :app-payments:test
-> Task :app-common:compileKotlin UP-TO-DATE
-> Task :app-common:compileJava NO-SOURCE
-> Task :app-common:processResources UP-TO-DATE
-> Task :app-common:classes UP-TO-DATE
-> Task :app-common:jar UP-TO-DATE
-> Task :app-payments:compileKotlin UP-TO-DATE
-> Task :app-payments:compileJava NO-SOURCE
-> Task :app-payments:processResources UP-TO-DATE
-> Task :app-payments:classes UP-TO-DATE
-> Task :app-payments:compileTestKotlin UP-TO-DATE
-> Task :app-payments:compileTestJava NO-SOURCE
-> Task :app-payments:processTestResources UP-TO-DATE
-> Task :app-payments:testClasses UP-TO-DATE
-Discovering tests in :app-payments:test
-Starting test execution for :app-payments:test
+Configuration on demand is an incubating feature.
+Parallel Configuration Cache is an incubating feature.
+Calculating task graph as no cached configuration is available for tasks: :backend:app-payments:test
+VFS> Statistics since last build:
+VFS> > Stat: Executed stat() x 0. getUnixMode() x 0
+Received 18 file system events since last build while watching 1 locations
+Virtual file system retained information about 125611 files, 17699 directories and 769 missing files since last build
+
+[33mThis task referenced 606 projects. Using the focus plugin can help bring this number down.
+Learn more about how you can focus by running `./focus help` from the repo root or by visiting https://example.com/focus[0m
+> Task :protos:protos-core-versioning:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :protos:protos-core-currency:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:core-extensions:compileKotlin FROM-CACHE
+> Task :core:core-extensions:classes UP-TO-DATE
+> Task :core:core-extensions:jar UP-TO-DATE
+> Task :backend:app-common:compileKotlin FROM-CACHE
+> Task :backend:app-common:classes UP-TO-DATE
+> Task :backend:app-common:jar
+> Task :backend:app-payments:compileKotlin UP-TO-DATE
+> Task :backend:app-payments:classes UP-TO-DATE
+> Task :backend:app-payments:compileTestKotlin UP-TO-DATE
+> Task :backend:app-payments:testClasses UP-TO-DATE
+Discovering tests in :backend:app-payments:test
+Starting test execution for :backend:app-payments:test
 Gradle Test Executor 1 started executing tests.
 com.example.payments.PaymentsServiceTest > testRefundAmount PASSED
 com.example.payments.PaymentsServiceTest > testPartialRefund PASSED
@@ -78,7 +81,7 @@ com.example.orders.OrderServiceTest > testCreateOrder FAILED
         at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:36)
         at java.lang.Thread.run(Thread.java:750)
 
-> Task :app-payments:test FAILED
+> Task :backend:app-payments:test FAILED
 
 com.example.payments.PaymentsServiceTest STANDARD_OUT
     SLF4J: Actual binding is of type [ch.qos.logback.classic.util.ContextSelectorStaticBinder]
@@ -86,9 +89,12 @@ com.example.payments.PaymentsServiceTest STANDARD_ERR
     2025-01-15 10:30:00.000 WARN  --- [main] c.e.payments.PaymentsService : Deprecated payment method used
 
 5 tests completed, 3 failed
+
+[Incubating] Problems report is available at: file:///Users/developer/example-backend/build/reports/problems/problems-report.html
+
 Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
-For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
-You can use '--warning-mode all' to show the individual deprecation warnings and determine if they are coming from your own scripts or plugins.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -99,8 +105,15 @@ You can use '--warning-mode all' to show the individual deprecation warnings and
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':app-payments:test'.
-> There were failing tests. See the report at: file:///Users/developer/backend/app-payments/build/reports/tests/test/index.html
+Execution failed for task ':backend:app-payments:test'.
+> There were failing tests. See the report at: file:///Users/developer/example-backend/backend/app-payments/build/reports/tests/test/index.html
 
 BUILD FAILED in 8s
 12 actionable tasks: 1 executed, 11 up-to-date
+Received 68536 file system events during the current build while watching 1 locations
+Virtual file system retains information about 158297 files, 24428 directories and 1255 missing files until next build
+
+Publishing build scan...
+https://develocity.example.com/s/hlnkde4iznd6m
+
+Configuration cache entry stored.
