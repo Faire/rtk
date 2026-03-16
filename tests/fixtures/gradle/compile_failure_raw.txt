@@ -7,8 +7,6 @@ VFS> > FileHasher: Hashed 0 files (0 bytes)
 Received 12 file system events since last build while watching 1 locations
 Virtual file system retained information about 125611 files, 17699 directories and 769 missing files since last build
 
-[33mThis task referenced 450 projects. Using the focus plugin can help bring this number down.
-Learn more about how you can focus by running `./focus help` from the repo root or by visiting https://example.com/focus[0m
 > Task :protos:protos-core-versioning:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :protos:protos-core-currency:checkKotlinGradlePluginConfigurationErrors SKIPPED
 > Task :events:checkKotlinGradlePluginConfigurationErrors SKIPPED
@@ -70,6 +68,6 @@ Received 1024 file system events during the current build while watching 1 locat
 Virtual file system retains information about 125611 files, 17699 directories and 769 missing files until next build
 
 Publishing build scan...
-https://develocity.example.com/s/abc123xyz
+https://scans.gradle.com/s/abc123xyz
 
 Configuration cache entry stored.
