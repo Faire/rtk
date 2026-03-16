@@ -138,26 +138,32 @@ fn find_gradle_executable() -> String {
     "gradle".to_string()
 }
 
-/// Inject `--console plain` if not already present in args.
-fn ensure_console_plain(args: &[String]) -> Vec<String> {
+/// Normalize gradle args: strip `--quiet`/`-q` (suppresses parseable output)
+/// and inject `--console plain` if not already present. Single allocation.
+fn normalize_args(args: &[String]) -> Vec<String> {
     let has_console = args
         .iter()
         .any(|a| a == "--console" || a.starts_with("--console="));
-    if has_console {
-        args.to_vec()
-    } else {
-        let mut result = args.to_vec();
+
+    let mut result: Vec<String> = args
+        .iter()
+        .filter(|a| a.as_str() != "--quiet" && a.as_str() != "-q")
+        .cloned()
+        .collect();
+
+    if !has_console {
         result.push("--console".to_string());
         result.push("plain".to_string());
-        result
     }
+
+    result
 }
 
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
     let timer = tracking::TimedExecution::start();
 
     let gradle = find_gradle_executable();
-    let full_args = ensure_console_plain(args);
+    let full_args = normalize_args(args);
 
     if verbose > 0 {
         eprintln!("Running: {} {}", gradle, full_args.join(" "));
@@ -382,40 +388,59 @@ mod tests {
 
     // --- ensure_console_plain tests ---
 
+    // --- normalize_args tests ---
+
     #[test]
-    fn test_console_plain_injected_when_missing() {
+    fn test_normalize_injects_console_plain() {
         let args = vec![":app:test".to_string()];
-        let result = ensure_console_plain(&args);
+        let result = normalize_args(&args);
         assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     #[test]
-    fn test_console_plain_not_duplicated() {
+    fn test_normalize_keeps_existing_console() {
         let args = vec![
             "--console".to_string(),
             "rich".to_string(),
             ":app:test".to_string(),
         ];
-        let result = ensure_console_plain(&args);
+        let result = normalize_args(&args);
         assert_eq!(result, args);
     }
 
     #[test]
-    fn test_console_plain_already_plain_not_duplicated() {
-        let args = vec![
-            "--console".to_string(),
-            "plain".to_string(),
-            ":app:test".to_string(),
-        ];
-        let result = ensure_console_plain(&args);
-        assert_eq!(result, args);
-    }
-
-    #[test]
-    fn test_console_equals_form_not_duplicated() {
+    fn test_normalize_keeps_console_equals() {
         let args = vec!["--console=plain".to_string(), ":app:test".to_string()];
-        let result = ensure_console_plain(&args);
+        let result = normalize_args(&args);
         assert_eq!(result, args);
+    }
+
+    #[test]
+    fn test_normalize_strips_quiet_long() {
+        let args = vec!["--quiet".to_string(), ":app:test".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_strips_quiet_short() {
+        let args = vec!["-q".to_string(), ":app:test".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_preserves_other_flags() {
+        let args = vec![
+            "--continue".to_string(),
+            ":app:test".to_string(),
+            "--info".to_string(),
+        ];
+        let result = normalize_args(&args);
+        assert_eq!(
+            result,
+            vec!["--continue", ":app:test", "--info", "--console", "plain"]
+        );
     }
 
     // --- detect_task_type_from_output tests ---
