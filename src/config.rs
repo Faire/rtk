@@ -105,6 +105,28 @@ pub struct GradleConfig {
     /// Additional regex patterns for lines to drop (applied after built-in global filters).
     #[serde(default)]
     pub extra_drop_patterns: Vec<String>,
+    /// Additional package prefixes to treat as framework noise in stack traces.
+    /// Built-in: java.*, kotlin.*, sun.*, javax.*, jdk.*, jakarta.*, *.internal.*
+    /// Default extras: org.gradle, org.junit.platform, org.junit.jupiter.engine,
+    ///   org.springframework, com.google.inject, io.grpc, org.mockito, io.mockk,
+    ///   org.eclipse.jetty
+    #[serde(default = "default_drop_frame_packages")]
+    pub drop_frame_packages: Vec<String>,
+}
+
+pub fn default_drop_frame_packages() -> Vec<String> {
+    vec![
+        "org.gradle".to_string(),
+        "org.junit.platform".to_string(),
+        "org.junit.jupiter.engine".to_string(),
+        "org.springframework".to_string(),
+        "com.google.inject".to_string(),
+        "io.grpc".to_string(),
+        "org.mockito".to_string(),
+        "io.mockk".to_string(),
+        "org.eclipse.jetty".to_string(),
+        "org.assertj.core.internal".to_string(),
+    ]
 }
 
 /// Check if telemetry is enabled in config. Returns None if config can't be loaded.
