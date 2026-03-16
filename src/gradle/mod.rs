@@ -195,13 +195,8 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         println!("{}", filtered);
     }
 
-    // Include stderr if it has content not already in stdout, filtered for noise
-    if !stderr.trim().is_empty() && !stdout.contains(stderr.trim()) {
-        let filtered_stderr = global::apply_global_filters(&stderr);
-        if !filtered_stderr.trim().is_empty() {
-            eprintln!("{}", filtered_stderr.trim());
-        }
-    }
+    // stderr is already included in `raw` (line 177) and filtered through the pipeline.
+    // No separate stderr output needed — printing it again would duplicate the output.
 
     timer.track(
         &format!("{} {}", gradle, args.join(" ")),
