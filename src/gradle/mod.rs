@@ -497,4 +497,27 @@ mod tests {
         let args = vec![":app:billing:IntegrationTest".to_string()];
         assert!(is_integration_test(&args));
     }
+
+    // --- stderr noise filtering tests ---
+
+    #[test]
+    fn test_global_filters_strip_jvm_warning_from_stderr() {
+        let stderr = "OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended";
+        let filtered = global::apply_global_filters(stderr);
+        assert!(
+            filtered.trim().is_empty(),
+            "JVM warning should be stripped from stderr: got '{}'",
+            filtered
+        );
+    }
+
+    #[test]
+    fn test_global_filters_keep_real_stderr_errors() {
+        let stderr = "FAILURE: Build failed with an exception.\n\n* What went wrong:\nExecution failed for task ':app:test'.";
+        let filtered = global::apply_global_filters(stderr);
+        assert!(
+            filtered.contains("FAILURE: Build failed"),
+            "Real errors should be preserved in stderr"
+        );
+    }
 }
