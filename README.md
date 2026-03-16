@@ -50,8 +50,9 @@ rtk filters and compresses command outputs before they reach your LLM context. S
 | `ruff check` | 3x | 3,000 | 600 | -80% |
 | `pytest` | 4x | 8,000 | 800 | -90% |
 | `go test` | 3x | 6,000 | 600 | -90% |
+| `gradle test/build` | 5x | 15,000 | 1,500 | -90% |
 | `docker ps` | 3x | 900 | 180 | -80% |
-| **Total** | | **~118,000** | **~23,900** | **-80%** |
+| **Total** | | **~133,000** | **~25,400** | **-81%** |
 
 > Estimates based on medium-sized TypeScript/Rust projects. Actual savings vary by project size.
 
@@ -183,6 +184,24 @@ rtk cargo clippy                # Cargo clippy (-80%)
 rtk ruff check                  # Python linting (JSON, -80%)
 rtk golangci-lint run           # Go linting (JSON, -85%)
 ```
+
+### Gradle
+```bash
+rtk gradle :app:test            # Test failures only, stack trace truncation (-90%)
+rtk gradle :app:compileKotlin   # Errors + path normalization (-85%)
+rtk gradle :app:detekt          # Violations grouped by rule (-85%)
+rtk gradle :app:dependencies    # Dependency tree truncated to depth 1 (-70%)
+rtk gradle :app:projectHealth   # Health report, global noise stripped
+rtk gradle :app:buildProtos     # Proto errors only
+rtk gradle check                # Multi-task: per-task routing + batch summary
+```
+
+Gradle support includes:
+- **Auto-detection**: Task type detected from args or `> Task` output lines (case-insensitive)
+- **`--console plain` injection**: Automatically added for parseable output
+- **Global noise filters**: Daemon startup, config cache, deprecation warnings, build scans all stripped
+- **Stack trace truncation**: Keeps user code + assertion frames, drops framework noise (configurable via `config.toml`)
+- **Batch runs**: Multi-task commands (e.g. `check`, `build`) split by task boundary with per-task filtering
 
 ### Package Managers
 ```bash
@@ -324,6 +343,7 @@ cp hooks/opencode-rtk.ts ~/.config/opencode/plugins/rtk.ts
 | `pip list/install` | `rtk pip ...` |
 | `go test/build/vet` | `rtk go ...` |
 | `golangci-lint` | `rtk golangci-lint` |
+| `gradle/gradlew <task>` | `rtk gradle ...` |
 | `docker ps/images/logs` | `rtk docker ...` |
 | `kubectl get/logs` | `rtk kubectl ...` |
 | `curl` | `rtk curl` |
@@ -348,6 +368,11 @@ exclude_commands = ["curl", "playwright"]  # skip rewrite for these
 enabled = true          # save raw output on failure (default: true)
 mode = "failures"       # "failures", "always", or "never"
 max_files = 20          # rotation limit
+
+[gradle]
+user_packages = ["com.mycompany"]       # treat as user code in stack traces
+drop_frame_packages = ["com.thirdparty"] # additional framework noise to drop
+extra_drop_patterns = ["^MyBuildPlugin:"] # extra regex lines to drop
 ```
 
 ### Tee: Full Output Recovery
