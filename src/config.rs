@@ -16,6 +16,8 @@ pub struct Config {
     pub telemetry: TelemetryConfig,
     #[serde(default)]
     pub hooks: HooksConfig,
+    #[serde(default)]
+    pub gradle: GradleConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -92,6 +94,17 @@ impl Default for TelemetryConfig {
     fn default() -> Self {
         Self { enabled: true }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct GradleConfig {
+    /// Package prefixes treated as "user code" in stack traces (kept, not dropped).
+    /// Default: [] (empty — all frames treated as framework noise).
+    #[serde(default)]
+    pub user_packages: Vec<String>,
+    /// Additional regex patterns for lines to drop (applied after built-in global filters).
+    #[serde(default)]
+    pub extra_drop_patterns: Vec<String>,
 }
 
 /// Check if telemetry is enabled in config. Returns None if config can't be loaded.
