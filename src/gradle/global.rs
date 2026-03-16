@@ -37,8 +37,6 @@ lazy_static! {
         Regex::new(r"(?i)^WARNING:.*illegal reflective|(?i)^WARNING:.*reflect").unwrap(),
         // File system events
         Regex::new(r"^Received \d+ file system events").unwrap(),
-        // AWS SSO / authentication warnings (common in CI/dev environments)
-        Regex::new(r"^aws: \[ERROR\]|^.*AWS CLI is not authenticated").unwrap(),
         // Javac/kapt notes (not actionable)
         Regex::new(r"^Note: ").unwrap(),
     ];
