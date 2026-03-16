@@ -2,6 +2,9 @@
 source: src/gradle/test_filter.rs
 expression: output
 ---
+[33mThis task referenced 606 projects. Using the focus plugin can help bring this number down.
+Learn more about how you can focus by running `./focus help` from the repo root or by visiting https://example.com/focus[0m
+
 9 tests completed, 0 failed
 
 BUILD SUCCESSFUL in 8s
