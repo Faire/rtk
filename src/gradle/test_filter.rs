@@ -29,6 +29,22 @@ pub fn is_integration_task_name(task_name: &str) -> bool {
         || t.starts_with("connected")
 }
 
+/// Built-in framework prefixes that are always dropped from stack traces.
+/// These are JDK/Kotlin stdlib and internal packages — universally noise.
+const BUILTIN_FRAMEWORK_PREFIXES: &[&str] = &[
+    "java.",
+    "kotlin.",
+    "kotlinx.coroutines.",
+    "sun.",
+    "javax.",
+    "jdk.",
+    "jakarta.",
+    "android.",
+    "androidx.",
+    "dalvik.",
+    "com.android.internal.",
+];
+
 lazy_static! {
     /// Patterns for passing test lines
     static ref PASSING_TEST: Regex = Regex::new(r"^\S+.*\bPASSED\s*$").unwrap();
@@ -40,53 +56,74 @@ lazy_static! {
     static ref STANDARD_STREAM: Regex = Regex::new(
         r"^\S+.*\bSTANDARD_(OUT|ERR)\s*$"
     ).unwrap();
-    /// Integration test noise: Hibernate, HikariPool, Docker/Testcontainers, Spring context
-    static ref INTEGRATION_NOISE: Vec<Regex> = vec![
-        Regex::new(r"HHH\d+").unwrap(),
-        Regex::new(r"Hibernate").unwrap(),
-        Regex::new(r"HikariPool").unwrap(),
-        Regex::new(r"HikariDataSource").unwrap(),
-        Regex::new(r"DockerClientProviderStrategy").unwrap(),
-        Regex::new(r"ImageNameSubstitutor").unwrap(),
-        Regex::new(r"Testcontainers").unwrap(),
-        Regex::new(r"SpringBootTestContextBootstrapper").unwrap(),
-        Regex::new(r"AbstractContextLoader.*Spring context").unwrap(),
-        Regex::new(r"EndpointLinksResolver").unwrap(),
-    ];
 
     // Stack trace frame classification patterns
     static ref USER_CODE: Regex = Regex::new(r"^\s+at com\.example\.").unwrap();
     static ref ASSERTION_FRAME: Regex = Regex::new(
         r"^\s+at (org\.junit\.Assert|org\.assertj|kotlin\.test|org\.junit\.jupiter\.api\.Assertion|org\.opentest4j\.)"
     ).unwrap();
-    static ref FRAMEWORK_FRAME: Regex = Regex::new(
-        r"^\s+at (org\.mockito\.|io\.mockk\.|kotlinx\.coroutines\.|kotlin\.coroutines\.|sun\.reflect\.|java\.lang\.reflect\.|jdk\.internal\.reflect\.|org\.junit\.platform\.|org\.junit\.jupiter\.engine\.|org\.gradle\.api\.internal\.|org\.gradle\.internal\.|org\.eclipse\.jetty\.|javax\.servlet\.|jakarta\.servlet\.|org\.springframework\.|com\.google\.inject\.|io\.grpc\.internal\.|io\.grpc\.stub\.|java\.util\.|java\.lang\.Thread\.|android\.|androidx\.|dalvik\.|com\.android\.internal\.)"
-    ).unwrap();
     static ref CAUSED_BY: Regex = Regex::new(r"^\s+(Caused by:|Suppressed:)").unwrap();
     static ref FRAME_LINE: Regex = Regex::new(r"^\s+at ").unwrap();
     static ref MORE_LINE: Regex = Regex::new(r"^\s+\.\.\. \d+ more").unwrap();
 }
 
-/// Apply TEST-specific filtering on top of globally-filtered output.
-pub fn filter_test(input: &str, is_integration: bool) -> String {
-    let user_packages = load_user_packages();
-    filter_test_with_packages(input, is_integration, &user_packages)
+/// Build a framework frame regex from built-in prefixes + configurable drop_frame_packages.
+fn build_framework_regex(drop_frame_packages: &[String]) -> Regex {
+    let mut prefixes: Vec<String> = BUILTIN_FRAMEWORK_PREFIXES
+        .iter()
+        .map(|p| regex::escape(p))
+        .collect();
+
+    for pkg in drop_frame_packages {
+        prefixes.push(regex::escape(pkg));
+    }
+
+    // Also match any package containing ".internal." (catches org.gradle.internal, etc.)
+    let pattern = format!(r"^\s+at ({}|\S+\.internal\.)", prefixes.join("|"));
+    Regex::new(&pattern).unwrap_or_else(|_| {
+        // Fallback: just built-in prefixes if user config is invalid
+        let builtin: Vec<String> = BUILTIN_FRAMEWORK_PREFIXES
+            .iter()
+            .map(|p| regex::escape(p))
+            .collect();
+        Regex::new(&format!(r"^\s+at ({}|\S+\.internal\.)", builtin.join("|"))).unwrap()
+    })
 }
 
-/// Load user_packages from config.
-fn load_user_packages() -> Vec<String> {
+/// Apply TEST-specific filtering on top of globally-filtered output.
+pub fn filter_test(input: &str, _is_integration: bool) -> String {
+    let (user_packages, drop_frame_packages) = load_config();
+    filter_test_with_config(input, &user_packages, &drop_frame_packages)
+}
+
+/// Load user_packages and drop_frame_packages from config.
+fn load_config() -> (Vec<String>, Vec<String>) {
     match crate::config::Config::load() {
-        Ok(config) => config.gradle.user_packages,
-        Err(_) => Vec::new(),
+        Ok(config) => (
+            config.gradle.user_packages,
+            config.gradle.drop_frame_packages,
+        ),
+        Err(_) => (Vec::new(), crate::config::default_drop_frame_packages()),
     }
 }
 
-/// Core test filter logic, testable with explicit user packages.
+/// Core test filter logic, testable with explicit config.
 pub fn filter_test_with_packages(
     input: &str,
-    is_integration: bool,
+    _is_integration: bool,
     user_packages: &[String],
 ) -> String {
+    let drop_frame_packages = crate::config::default_drop_frame_packages();
+    filter_test_with_config(input, user_packages, &drop_frame_packages)
+}
+
+/// Core test filter logic with full config.
+fn filter_test_with_config(
+    input: &str,
+    user_packages: &[String],
+    drop_frame_packages: &[String],
+) -> String {
+    let framework_re = build_framework_regex(drop_frame_packages);
     let mut result = Vec::new();
     let mut in_standard_stream = false;
     let lines: Vec<&str> = input.lines().collect();
@@ -127,20 +164,11 @@ pub fn filter_test_with_packages(
             {
                 in_standard_stream = false;
                 // Fall through to process this line
-            } else if is_integration && INTEGRATION_NOISE.iter().any(|re| re.is_match(trimmed)) {
-                i += 1;
-                continue;
             } else {
                 // Non-failure content in standard stream — drop
                 i += 1;
                 continue;
             }
-        }
-
-        // Integration test extra noise (outside standard streams too)
-        if is_integration && INTEGRATION_NOISE.iter().any(|re| re.is_match(trimmed)) {
-            i += 1;
-            continue;
         }
 
         // Stack trace handling: detect FAILED line followed by exception
@@ -149,7 +177,8 @@ pub fn filter_test_with_packages(
             i += 1;
 
             // Collect and filter the stack trace
-            let (trace_lines, consumed) = collect_stack_trace(&lines[i..], user_packages);
+            let (trace_lines, consumed) =
+                collect_stack_trace(&lines[i..], user_packages, &framework_re);
             result.extend(trace_lines);
             i += consumed;
             continue;
@@ -178,7 +207,11 @@ pub fn filter_test_with_packages(
 
 /// Collect and filter a stack trace starting from the exception line.
 /// Returns (filtered_lines, number_of_input_lines_consumed).
-fn collect_stack_trace(lines: &[&str], user_packages: &[String]) -> (Vec<String>, usize) {
+fn collect_stack_trace(
+    lines: &[&str],
+    user_packages: &[String],
+    framework_re: &Regex,
+) -> (Vec<String>, usize) {
     let mut result = Vec::new();
     let mut consumed = 0;
     let mut user_frames_kept = 0;
@@ -251,6 +284,7 @@ fn collect_stack_trace(lines: &[&str], user_packages: &[String]) -> (Vec<String>
         // to avoid being shadowed by framework frames in deep traces.
         let is_user = is_user_code_frame(line, user_packages);
         let is_assertion = ASSERTION_FRAME.is_match(line);
+        let is_framework = framework_re.is_match(line);
 
         // User frames are ALWAYS kept (up to max_user_frames)
         if is_user {
@@ -269,9 +303,12 @@ fn collect_stack_trace(lines: &[&str], user_packages: &[String]) -> (Vec<String>
             // Keep first assertion frame
             result.push(line.to_string());
             assertion_kept = true;
-        } else {
-            // Framework/unknown frame — drop
+        } else if is_framework {
+            // Framework frame — drop
             dropped_count += 1;
+        } else {
+            // Unknown frame — keep (could be third-party library user cares about)
+            result.push(line.to_string());
         }
     }
 
@@ -377,6 +414,50 @@ mod tests {
         assert!(!is_integration_task_name("testDebugUnitTest"));
     }
 
+    // --- build_framework_regex tests ---
+
+    #[test]
+    fn test_framework_regex_matches_builtin() {
+        let re = build_framework_regex(&[]);
+        assert!(re.is_match("    at java.lang.Thread.run(Thread.java:750)"));
+        assert!(re.is_match("    at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)"));
+        assert!(re.is_match("    at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)"));
+        assert!(re.is_match(
+            "    at jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)"
+        ));
+    }
+
+    #[test]
+    fn test_framework_regex_matches_internal() {
+        let re = build_framework_regex(&[]);
+        // Any package with .internal. should match
+        assert!(re.is_match(
+            "    at org.gradle.api.internal.tasks.testing.SomeClass.run(SomeClass.java:42)"
+        ));
+        assert!(re.is_match("    at com.example.internal.SomeUtil.run(SomeUtil.java:1)"));
+    }
+
+    #[test]
+    fn test_framework_regex_matches_configured() {
+        let extras = vec![
+            "org.springframework".to_string(),
+            "com.google.inject".to_string(),
+        ];
+        let re = build_framework_regex(&extras);
+        assert!(re.is_match("    at org.springframework.test.context.TestContextManager.prepareTestInstance(TestContextManager.java:244)"));
+        assert!(re.is_match(
+            "    at com.google.inject.internal.InjectorImpl.inject(InjectorImpl.java:123)"
+        ));
+    }
+
+    #[test]
+    fn test_framework_regex_does_not_match_user_code() {
+        let re = build_framework_regex(&[]);
+        assert!(
+            !re.is_match("    at com.example.billing.PaymentTest.testCharge(PaymentTest.kt:42)")
+        );
+    }
+
     // Filter tests
     #[test]
     fn test_test_success_snapshot() {
@@ -451,6 +532,7 @@ mod tests {
 
     #[test]
     fn test_stack_trace_truncation_basic() {
+        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: expected:<1> but was:<2>",
             "        at org.junit.Assert.failNotEquals(Assert.java:834)",
@@ -462,7 +544,7 @@ mod tests {
             "        at java.lang.Thread.run(Thread.java:750)",
             "",
         ];
-        let (result, consumed) = collect_stack_trace(&trace, &["com.example".to_string()]);
+        let (result, consumed) = collect_stack_trace(&trace, &["com.example".to_string()], &re);
         assert_eq!(consumed, trace.len());
 
         let output = result.join("\n");
@@ -479,6 +561,7 @@ mod tests {
 
     #[test]
     fn test_caused_by_chain() {
+        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
         let trace = vec![
             "    org.opentest4j.AssertionFailedError: Expected failure",
             "        at org.junit.jupiter.api.Assertions.fail(Assertions.java:55)",
@@ -490,7 +573,7 @@ mod tests {
             "            ... 5 more",
             "",
         ];
-        let (result, _) = collect_stack_trace(&trace, &["com.example".to_string()]);
+        let (result, _) = collect_stack_trace(&trace, &["com.example".to_string()], &re);
         let output = result.join("\n");
         assert!(output.contains("Caused by: java.lang.RuntimeException"));
         assert!(output.contains("com.example.foo.FooService.doThing"));
@@ -498,7 +581,7 @@ mod tests {
 
     #[test]
     fn test_empty_user_packages_max_truncation() {
-        // With no user packages, all frames are framework noise
+        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: test failed",
             "        at org.junit.Assert.fail(Assert.java:100)",
@@ -506,15 +589,17 @@ mod tests {
             "        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
             "",
         ];
-        let (result, _) = collect_stack_trace(&trace, &[]);
+        let (result, _) = collect_stack_trace(&trace, &[], &re);
         let output = result.join("\n");
         // com.example should still be kept via the built-in USER_CODE regex
         assert!(output.contains("com.example.foo.FooTest"));
     }
 
     #[test]
-    fn test_non_matching_package_drops_all_user_frames() {
-        // With user_packages=["com.acme"], com.example frames become framework noise
+    fn test_non_matching_package_keeps_unknown_frames() {
+        // With user_packages=["com.acme"], com.example is NOT a user frame
+        // but also NOT a framework frame — so it's kept as an unknown (potentially useful) frame
+        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: expected:<1> but was:<2>",
             "        at org.junit.Assert.failNotEquals(Assert.java:834)",
@@ -522,21 +607,20 @@ mod tests {
             "        at sun.reflect.NativeMethodAccessorImpl.invoke0(Native Method)",
             "",
         ];
-        let (result, _) = collect_stack_trace(&trace, &["com.acme".to_string()]);
+        let (result, _) = collect_stack_trace(&trace, &["com.acme".to_string()], &re);
         let output = result.join("\n");
-        // com.example should NOT be kept since only com.acme is configured
+        // com.example IS kept — it's not in the framework list, could be useful
         assert!(
-            !output.contains("com.example.foo.FooTest"),
-            "com.example should be treated as framework when user_packages=[com.acme]"
+            output.contains("com.example.foo.FooTest"),
+            "Unknown frames (not framework, not user) should be kept"
         );
-        // Assertion frame and exception message should still be kept
-        assert!(output.contains("AssertionError"));
-        assert!(output.contains("org.junit.Assert.failNotEquals"));
+        // Framework frames (sun.reflect) should be dropped
+        assert!(!output.contains("NativeMethodAccessorImpl"));
     }
 
     #[test]
     fn test_user_frames_kept_after_many_framework_frames() {
-        // Verify user frames are not dropped even if >8 framework frames precede them
+        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
         let mut trace = vec!["    java.lang.AssertionError: test failed".to_string()];
         for i in 0..10 {
             trace.push(format!(
@@ -547,7 +631,7 @@ mod tests {
         trace.push("        at com.example.foo.FooTest.test(FooTest.kt:10)".to_string());
         trace.push(String::new());
         let trace_refs: Vec<&str> = trace.iter().map(|s| s.as_str()).collect();
-        let (result, _) = collect_stack_trace(&trace_refs, &["com.example".to_string()]);
+        let (result, _) = collect_stack_trace(&trace_refs, &["com.example".to_string()], &re);
         let output = result.join("\n");
         assert!(
             output.contains("com.example.foo.FooTest.test"),
@@ -567,21 +651,6 @@ mod tests {
         assert!(
             !output.contains("SLF4J"),
             "STANDARD_OUT content should be dropped"
-        );
-    }
-
-    #[test]
-    fn test_integration_drops_hibernate_noise() {
-        let input = include_str!("../../tests/fixtures/gradle/integration_test_failure_raw.txt");
-        let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, true);
-        assert!(
-            !output.contains("Hibernate"),
-            "Hibernate noise should be dropped in integration tests"
-        );
-        assert!(
-            !output.contains("HikariPool"),
-            "HikariPool noise should be dropped in integration tests"
         );
     }
 }

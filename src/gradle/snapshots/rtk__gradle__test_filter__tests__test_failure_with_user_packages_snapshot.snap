@@ -2,12 +2,17 @@
 source: src/gradle/test_filter.rs
 expression: output
 ---
+[33mThis task referenced 606 projects. Using the focus plugin can help bring this number down.
+Learn more about how you can focus by running `./focus help` from the repo root or by visiting https://example.com/focus[0m
+
 com.example.payments.PaymentsServiceTest > testChargeAmount FAILED
     java.lang.AssertionError: expected:<100> but was:<50>
         at org.junit.Assert.failNotEquals(Assert.java:834)
+        at org.junit.Assert.assertEquals(Assert.java:645)
+        at org.junit.Assert.assertEquals(Assert.java:631)
         at com.example.payments.helpers.PaymentAssertions.assertChargeAmount(PaymentAssertions.kt:45)
         at com.example.payments.PaymentsServiceTest.testChargeAmount(PaymentsServiceTest.kt:33)
-    ... 17 more
+    ... 15 more
 
 com.example.payments.PaymentsServiceTest > testRefundProcess FAILED
     java.lang.IllegalStateException: Refund already processed

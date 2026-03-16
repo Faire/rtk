@@ -2,24 +2,45 @@
 source: src/gradle/test_filter.rs
 expression: output
 ---
+[33mThis task referenced 606 projects. Using the focus plugin can help bring this number down.
+Learn more about how you can focus by running `./focus help` from the repo root or by visiting https://example.com/focus[0m
+
 com.example.payments.PaymentsServiceTest > testChargeAmount FAILED
     java.lang.AssertionError: expected:<100> but was:<50>
         at org.junit.Assert.failNotEquals(Assert.java:834)
+        at org.junit.Assert.assertEquals(Assert.java:645)
+        at org.junit.Assert.assertEquals(Assert.java:631)
         at com.example.payments.helpers.PaymentAssertions.assertChargeAmount(PaymentAssertions.kt:45)
         at com.example.payments.PaymentsServiceTest.testChargeAmount(PaymentsServiceTest.kt:33)
-    ... 17 more
+        at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:688)
+        at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+        at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:149)
+        at org.junit.jupiter.engine.execution.ExecutableInvoker$ReflectiveInterceptorCall.lambda$ofVoidMethod$0(ExecutableInvoker.java:115)
+        at org.junit.jupiter.engine.execution.ExecutableInvoker.lambda$invoke$0(ExecutableInvoker.java:105)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain.proceed(InvocationInterceptorChain.java:106)
+    ... 7 more
 
 com.example.payments.PaymentsServiceTest > testRefundProcess FAILED
     java.lang.IllegalStateException: Refund already processed
         at com.example.payments.RefundService.processRefund(RefundService.kt:92)
         at com.example.payments.PaymentsServiceTest.testRefundProcess(PaymentsServiceTest.kt:78)
-    ... 11 more
+        at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:688)
+        at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+        at org.junit.jupiter.engine.execution.InvocationInterceptorChain$ValidatingInvocation.proceed(InvocationInterceptorChain.java:131)
+        at org.junit.jupiter.engine.extension.TimeoutExtension.intercept(TimeoutExtension.java:149)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+    ... 6 more
 
 
 com.example.orders.OrderServiceTest > testCreateOrder FAILED
     java.lang.NullPointerException: Order token is null
         at com.example.orders.OrderServiceTest.testCreateOrder(OrderServiceTest.kt:44)
-    ... 8 more
+        at org.junit.platform.commons.util.ReflectionUtils.invokeMethod(ReflectionUtils.java:688)
+        at org.junit.jupiter.engine.execution.MethodInvocation.proceed(MethodInvocation.java:60)
+        at org.junit.platform.engine.support.hierarchical.ThrowableCollector.execute(ThrowableCollector.java:73)
+    ... 5 more
 
 > Task :backend:app-payments:test FAILED
 
