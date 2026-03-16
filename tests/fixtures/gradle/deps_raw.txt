@@ -1,0 +1,49 @@
+Starting Gradle Daemon...
+Gradle Daemon started in 1854 ms
+> Configure project :
+> Configure project :app-payments
+Calculating task graph as no cached configuration is available for tasks: :app-payments:dependencies
+
+> Task :app-payments:dependencies
+
+------------------------------------------------------------
+Project ':app-payments'
+------------------------------------------------------------
+
+runtimeClasspath - Runtime classpath of source set 'main'.
++--- com.google.guava:guava:31.1-jre
+|    +--- com.google.guava:failureaccess:1.0.1
+|    +--- com.google.guava:listenablefuture:9999.0-empty-to-avoid-conflict-with-guava
+|    +--- com.google.code.findbugs:jsr305:3.0.2
+|    +--- org.checkerframework:checker-qual:3.12.0
+|    \--- com.google.errorprone:error_prone_annotations:2.11.0
++--- org.apache.commons:commons-lang3:3.12.0
++--- com.example.payments:payments-api:1.0.0
+|    +--- com.google.protobuf:protobuf-java:3.21.12
+|    |    \--- com.google.protobuf:protobuf-java:3.21.12 (*)
+|    +--- io.grpc:grpc-protobuf:1.54.0
+|    |    +--- io.grpc:grpc-api:1.54.0
+|    |    |    +--- io.grpc:grpc-context:1.54.0
+|    |    |    +--- com.google.code.findbugs:jsr305:3.0.2
+|    |    |    \--- com.google.errorprone:error_prone_annotations:2.14.0 -> 2.11.0
+|    |    +--- com.google.protobuf:protobuf-java:3.21.12 (*)
+|    |    +--- com.google.api.grpc:proto-google-common-protos:2.9.0
+|    |    |    +--- com.google.protobuf:protobuf-java:3.21.12 (*)
+|    |    |    \--- com.google.api:api-common:2.2.1
+|    |    |         \--- com.google.guava:guava:31.1-jre (*)
+|    |    \--- io.grpc:grpc-api:1.54.0 (*)
+|    \--- io.grpc:grpc-stub:1.54.0
+|         \--- io.grpc:grpc-api:1.54.0 (*)
++--- org.jetbrains.kotlin:kotlin-stdlib:1.9.22
+|    +--- org.jetbrains.kotlin:kotlin-stdlib-common:1.9.22
+|    \--- org.jetbrains:annotations:13.0
+\--- ch.qos.logback:logback-classic:1.4.14
+     +--- ch.qos.logback:logback-core:1.4.14
+     \--- org.slf4j:slf4j-api:2.0.7
+
+(*) - Dependency has been listed previously
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+For more on this, please refer to https://docs.gradle.org/8.5/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 3s
+1 actionable task: 1 executed
