@@ -24,10 +24,26 @@ pub enum TaskType {
     Generic,
 }
 
+/// Registry of task type matchers, checked in priority order.
+/// Integration test must precede test (test is an exact match that would shadow it).
+const TASK_TYPE_REGISTRY: &[(fn(&str) -> bool, TaskType)] = &[
+    (deps::matches_task, TaskType::Deps),
+    (
+        test_filter::matches_integration_task,
+        TaskType::IntegrationTest,
+    ),
+    (test_filter::matches_test_task, TaskType::Test),
+    (detekt::matches_task, TaskType::Detekt),
+    (health::matches_task, TaskType::Health),
+    (compile::matches_task, TaskType::Compile),
+    (proto::matches_task, TaskType::Proto),
+];
+
 /// Detect the task type from gradle arguments.
 ///
-/// Scans all args for task name patterns. If multiple tasks are present
-/// (batch run), returns `Generic` — the batch filter handles per-task routing.
+/// Scans all args for task name patterns using per-module matchers.
+/// If multiple distinct task types are present (batch run), returns `Generic`
+/// — the batch filter handles per-task routing.
 pub fn detect_task_type(args: &[String]) -> TaskType {
     let mut detected: Vec<TaskType> = Vec::new();
 
@@ -38,33 +54,16 @@ pub fn detect_task_type(args: &[String]) -> TaskType {
         }
 
         // Extract the task name (last segment after :)
-        let task_name = arg.rsplit(':').next().unwrap_or(arg);
-
-        let task_type = if task_name == "dependencies" {
-            Some(TaskType::Deps)
-        } else if task_name == "integrationTest" || task_name == "componentTest" {
-            Some(TaskType::IntegrationTest)
-        } else if task_name == "test" {
-            Some(TaskType::Test)
-        } else if task_name.starts_with("detekt") {
-            Some(TaskType::Detekt)
-        } else if task_name.starts_with("projectHealth") {
-            Some(TaskType::Health)
-        } else if task_name == "compileKotlin"
-            || task_name == "compileTestKotlin"
-            || task_name == "compileJava"
-            || task_name == "compileTestJava"
-            || task_name.ends_with("Classes")
-        {
-            Some(TaskType::Compile)
-        } else if task_name == "buildProtos"
-            || task_name == "generateProtos"
-            || task_name.contains("Proto")
-        {
-            Some(TaskType::Proto)
-        } else {
-            None
+        let task_name = match arg.rfind(':') {
+            Some(pos) => &arg[pos + 1..],
+            None => arg,
         };
+
+        // Walk registry in priority order, first match wins
+        let task_type = TASK_TYPE_REGISTRY
+            .iter()
+            .find(|(matcher, _)| matcher(task_name))
+            .map(|(_, tt)| tt.clone());
 
         if let Some(tt) = task_type {
             if !detected.iter().any(|d| d == &tt) {
@@ -193,79 +192,85 @@ mod tests {
 
     #[test]
     fn test_detect_compile_kotlin() {
-        let args = vec![":backend:backend-payments:compileKotlin".to_string()];
+        let args = vec![":app:billing:compileKotlin".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Compile);
     }
 
     #[test]
     fn test_detect_compile_test_kotlin() {
-        let args = vec![":backend:backend-payments:compileTestKotlin".to_string()];
+        let args = vec![":app:billing:compileTestKotlin".to_string()];
+        assert_eq!(detect_task_type(&args), TaskType::Compile);
+    }
+
+    #[test]
+    fn test_detect_compile_integration_test_kotlin() {
+        let args = vec![":app:billing:compileIntegrationTestKotlin".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Compile);
     }
 
     #[test]
     fn test_detect_compile_classes() {
-        let args = vec![":backend:backend-payments:testClasses".to_string()];
+        let args = vec![":app:billing:testClasses".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Compile);
     }
 
     #[test]
     fn test_detect_test() {
-        let args = vec![":backend:backend-payments:test".to_string()];
+        let args = vec![":app:billing:test".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Test);
     }
 
     #[test]
     fn test_detect_integration_test() {
-        let args = vec![":backend:backend-payments:integrationTest".to_string()];
+        let args = vec![":app:billing:integrationTest".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::IntegrationTest);
     }
 
     #[test]
     fn test_detect_component_test() {
-        let args = vec![":backend:backend-payments:componentTest".to_string()];
+        let args = vec![":app:billing:componentTest".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::IntegrationTest);
     }
 
     #[test]
     fn test_detect_detekt() {
-        let args = vec![":backend:backend-payments:detekt".to_string()];
+        let args = vec![":app:billing:detekt".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Detekt);
     }
 
     #[test]
     fn test_detect_detekt_main() {
-        let args = vec![":backend:backend-payments:detektMain".to_string()];
+        let args = vec![":app:billing:detektMain".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Detekt);
     }
 
     #[test]
     fn test_detect_health() {
-        let args = vec![":backend:backend-payments:projectHealth".to_string()];
+        let args = vec![":app:billing:projectHealth".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Health);
     }
 
     #[test]
     fn test_detect_proto_build() {
-        let args = vec![":backend:backend-payments-api:buildProtos".to_string()];
+        let args = vec![":app:billing-api:buildProtos".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Proto);
     }
 
     #[test]
     fn test_detect_proto_generate() {
-        let args = vec![":backend:backend-payments-api:generateProtos".to_string()];
+        let args = vec![":app:billing-api:generateProtos".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Proto);
     }
 
     #[test]
     fn test_detect_deps() {
-        let args = vec![":backend:backend-payments:dependencies".to_string()];
+        let args = vec![":app:billing:dependencies".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Deps);
     }
 
     #[test]
     fn test_detect_generic_unknown_task() {
-        let args = vec![":backend:backend-payments:assemble".to_string()];
+        let args = vec![":app:billing:assemble".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Generic);
     }
 
@@ -279,7 +284,7 @@ mod tests {
     fn test_detect_skips_flags() {
         let args = vec![
             "--continue".to_string(),
-            ":backend:backend-payments:test".to_string(),
+            ":app:billing:test".to_string(),
             "--info".to_string(),
         ];
         assert_eq!(detect_task_type(&args), TaskType::Test);
@@ -288,8 +293,8 @@ mod tests {
     #[test]
     fn test_detect_multiple_same_type_returns_single() {
         let args = vec![
-            ":backend:backend-payments:test".to_string(),
-            ":backend:backend-orders:test".to_string(),
+            ":app:billing:test".to_string(),
+            ":app:orders:test".to_string(),
         ];
         assert_eq!(detect_task_type(&args), TaskType::Test);
     }
@@ -297,8 +302,8 @@ mod tests {
     #[test]
     fn test_detect_multiple_different_types_returns_generic() {
         let args = vec![
-            ":backend:backend-payments:test".to_string(),
-            ":backend:backend-payments:detekt".to_string(),
+            ":app:billing:test".to_string(),
+            ":app:billing:detekt".to_string(),
         ];
         assert_eq!(detect_task_type(&args), TaskType::Generic);
     }
