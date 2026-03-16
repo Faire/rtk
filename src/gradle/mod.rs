@@ -195,9 +195,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         println!("{}", filtered);
     }
 
-    // Include stderr if it has content not already in stdout
+    // Include stderr if it has content not already in stdout, filtered for noise
     if !stderr.trim().is_empty() && !stdout.contains(stderr.trim()) {
-        eprintln!("{}", stderr.trim());
+        let filtered_stderr = global::apply_global_filters(&stderr);
+        if !filtered_stderr.trim().is_empty() {
+            eprintln!("{}", filtered_stderr.trim());
+        }
     }
 
     timer.track(
