@@ -140,23 +140,13 @@ fn find_gradle_executable() -> String {
 
 /// Normalize gradle args in one pass:
 /// - Strip `--quiet`/`-q` (suppresses parseable output)
-/// - Force `--console plain` (strip any existing `--console` and re-add as plain)
+/// - Append `--console plain` (caller must reject non-plain `--console` before this)
 fn normalize_args(args: &[String]) -> Vec<String> {
     let mut result = Vec::with_capacity(args.len() + 2);
-    let mut skip_next = false;
 
     for arg in args {
-        if skip_next {
-            skip_next = false;
-            continue;
-        }
         match arg.as_str() {
             "--quiet" | "-q" => continue,
-            "--console" => {
-                skip_next = true; // skip the following value (e.g. "rich")
-                continue;
-            }
-            s if s.starts_with("--console=") => continue,
             _ => result.push(arg.clone()),
         }
     }
@@ -170,7 +160,40 @@ fn normalize_args(args: &[String]) -> Vec<String> {
 /// Reject these and tell the user to run gradle directly.
 const VERBOSE_FLAGS: &[&str] = &["--info", "--debug", "-d"];
 
+/// Check if args contain a `--console` value that isn't `plain`.
+/// Returns the non-plain value if found.
+fn find_non_plain_console(args: &[String]) -> Option<String> {
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        if arg == "--console" {
+            if let Some(val) = iter.next() {
+                if val != "plain" {
+                    return Some(format!("--console {}", val));
+                }
+            }
+        } else if let Some(val) = arg.strip_prefix("--console=") {
+            if val != "plain" {
+                return Some(arg.clone());
+            }
+        }
+    }
+    None
+}
+
 pub fn run(args: &[String], verbose: u8) -> Result<()> {
+    // Reject non-plain --console — rtk needs parseable output
+    if let Some(console_arg) = find_non_plain_console(args) {
+        let gradle = find_gradle_executable();
+        eprintln!(
+            "rtk: `{}` is incompatible with filtering — rtk requires `--console plain`. \
+             Either remove the flag or run directly:\n\n  {} {}",
+            console_arg,
+            gradle,
+            args.join(" ")
+        );
+        std::process::exit(1);
+    }
+
     // Reject verbose flags — the output is enormous and not filterable
     if let Some(flag) = args.iter().find(|a| VERBOSE_FLAGS.contains(&a.as_str())) {
         let gradle = find_gradle_executable();
@@ -428,28 +451,57 @@ mod tests {
     }
 
     #[test]
-    fn test_normalize_overrides_console_rich() {
+    fn test_normalize_appends_console_plain() {
+        // --console plain is always appended (caller rejects non-plain before normalize)
+        let args = vec![":app:test".to_string(), "--continue".to_string()];
+        let result = normalize_args(&args);
+        assert!(result.ends_with(&["--console".to_string(), "plain".to_string()]));
+    }
+
+    // --- find_non_plain_console tests ---
+
+    #[test]
+    fn test_rejects_console_rich() {
         let args = vec![
             "--console".to_string(),
             "rich".to_string(),
             ":app:test".to_string(),
         ];
-        let result = normalize_args(&args);
-        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+        assert_eq!(
+            find_non_plain_console(&args),
+            Some("--console rich".to_string())
+        );
     }
 
     #[test]
-    fn test_normalize_overrides_console_equals_rich() {
-        let args = vec!["--console=rich".to_string(), ":app:test".to_string()];
-        let result = normalize_args(&args);
-        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    fn test_rejects_console_equals_auto() {
+        let args = vec!["--console=auto".to_string(), ":app:test".to_string()];
+        assert_eq!(
+            find_non_plain_console(&args),
+            Some("--console=auto".to_string())
+        );
     }
 
     #[test]
-    fn test_normalize_overrides_console_equals_plain() {
+    fn test_accepts_console_plain() {
+        let args = vec![
+            "--console".to_string(),
+            "plain".to_string(),
+            ":app:test".to_string(),
+        ];
+        assert_eq!(find_non_plain_console(&args), None);
+    }
+
+    #[test]
+    fn test_accepts_console_equals_plain() {
         let args = vec!["--console=plain".to_string(), ":app:test".to_string()];
-        let result = normalize_args(&args);
-        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+        assert_eq!(find_non_plain_console(&args), None);
+    }
+
+    #[test]
+    fn test_accepts_no_console_flag() {
+        let args = vec![":app:test".to_string()];
+        assert_eq!(find_non_plain_console(&args), None);
     }
 
     #[test]
