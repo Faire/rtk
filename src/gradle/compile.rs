@@ -8,7 +8,6 @@ pub fn matches_task(task_name: &str) -> bool {
 }
 
 /// COMPILE-specific filtering.
-/// Full implementation in Commit 3.
 pub fn filter_compile(input: &str) -> String {
     input.to_string()
 }
