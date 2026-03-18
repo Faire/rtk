@@ -1,45 +1,46 @@
 use crate::utils::strip_ansi;
 use lazy_static::lazy_static;
-use regex::Regex;
+use regex::{Regex, RegexSet};
 
 lazy_static! {
-    static ref NOISE_PATTERNS: Vec<Regex> = vec![
+    /// Built-in noise patterns compiled into a single RegexSet for single-pass matching.
+    static ref NOISE_SET: RegexSet = RegexSet::new([
         // Task status lines (UP-TO-DATE, SKIPPED, NO-SOURCE, FROM-CACHE)
-        Regex::new(r"^> Task \S+ (UP-TO-DATE|SKIPPED|NO-SOURCE|FROM-CACHE)$").unwrap(),
+        r"^> Task \S+ (UP-TO-DATE|SKIPPED|NO-SOURCE|FROM-CACHE)$",
         // Bare executed task lines (no suffix) — replaced by ✓ summary
-        Regex::new(r"^> Task \S+\s*$").unwrap(),
+        r"^> Task \S+\s*$",
         // Configure lines
-        Regex::new(r"^> Configure project ").unwrap(),
+        r"^> Configure project ",
         // Daemon startup
-        Regex::new(r"^(Starting a? ?Gradle Daemon|Gradle Daemon started|Daemon initialized|Worker lease)").unwrap(),
+        r"^(Starting a? ?Gradle Daemon|Gradle Daemon started|Daemon initialized|Worker lease)",
         // JVM warnings
-        Regex::new(r"^(OpenJDK 64-Bit Server VM warning:|Initialized native services|Initialized jansi)").unwrap(),
+        r"^(OpenJDK 64-Bit Server VM warning:|Initialized native services|Initialized jansi)",
         // Incubating (including Problems report)
-        Regex::new(r"\[Incubating\]|Configuration on demand is an incubating feature|Parallel Configuration Cache is an incubating feature").unwrap(),
+        r"\[Incubating\]|Configuration on demand is an incubating feature|Parallel Configuration Cache is an incubating feature",
         // Config cache
-        Regex::new(r"^(Reusing configuration cache|Calculating task graph|Configuration cache entry|Storing configuration cache|Loading configuration cache)").unwrap(),
+        r"^(Reusing configuration cache|Calculating task graph|Configuration cache entry|Storing configuration cache|Loading configuration cache)",
         // Deprecation
-        Regex::new(r"^(Deprecated Gradle features were used|For more on this, please refer to|You can use '--warning-mode all')").unwrap(),
+        r"^(Deprecated Gradle features were used|For more on this, please refer to|You can use '--warning-mode all')",
         // Downloads + progress bars
-        Regex::new(r"^(Download |Downloading )").unwrap(),
-        Regex::new(r"^\s*\[[\s<=\->]+\]\s+\d+%").unwrap(),
+        r"^(Download |Downloading )",
+        r"^\s*\[[\s<=\->]+\]\s+\d+%",
         // Build scan + develocity URLs (both private develocity.* and public scans.gradle.com)
-        Regex::new(r"^(Publishing build scan|https://(develocity\.|scans\.gradle\.com)|Upload .* build scan|Waiting for build scan)").unwrap(),
+        r"^(Publishing build scan|https://(develocity\.|scans\.gradle\.com)|Upload .* build scan|Waiting for build scan)",
         // VFS (all VFS> lines and Virtual file system lines)
-        Regex::new(r"^(VFS>|Virtual file system )").unwrap(),
+        r"^(VFS>|Virtual file system )",
         // Evaluation
-        Regex::new(r"^(Evaluating root project|All projects evaluated|Settings evaluated)").unwrap(),
+        r"^(Evaluating root project|All projects evaluated|Settings evaluated)",
         // Classpath
-        Regex::new(r"^(Classpath snapshot |Snapshotting classpath)").unwrap(),
+        r"^(Classpath snapshot |Snapshotting classpath)",
         // Kotlin daemon
-        Regex::new(r"^(Kotlin compile daemon|Connected to the daemon)").unwrap(),
+        r"^(Kotlin compile daemon|Connected to the daemon)",
         // Reflection warnings
-        Regex::new(r"(?i)^WARNING:.*illegal reflective|(?i)^WARNING:.*reflect").unwrap(),
+        r"(?i)^WARNING:.*illegal reflective|(?i)^WARNING:.*reflect",
         // File system events
-        Regex::new(r"^Received \d+ file system events").unwrap(),
+        r"^Received \d+ file system events",
         // Javac/kapt notes (not actionable)
-        Regex::new(r"^Note: ").unwrap(),
-    ];
+        r"^Note: ",
+    ]).unwrap();
 }
 
 /// Apply global noise filters to gradle output.
@@ -51,29 +52,35 @@ pub fn apply_global_filters(input: &str) -> String {
 }
 
 /// Load extra drop patterns from config.toml [gradle] section.
-fn load_extra_patterns() -> Vec<Regex> {
+fn load_extra_patterns() -> Option<RegexSet> {
     match crate::config::Config::load() {
         Ok(config) => compile_extra_patterns(&config.gradle.extra_drop_patterns),
-        Err(_) => Vec::new(),
+        Err(_) => None,
     }
 }
 
-/// Compile user-supplied regex patterns, skipping invalid ones with stderr warning.
-pub fn compile_extra_patterns(patterns: &[String]) -> Vec<Regex> {
-    let mut compiled = Vec::new();
-    for p in patterns {
-        match Regex::new(p) {
-            Ok(re) => compiled.push(re),
+/// Compile user-supplied regex patterns into a RegexSet, skipping invalid ones with stderr warning.
+pub fn compile_extra_patterns(patterns: &[String]) -> Option<RegexSet> {
+    let valid: Vec<&str> = patterns
+        .iter()
+        .filter(|p| match Regex::new(p) {
+            Ok(_) => true,
             Err(e) => {
                 eprintln!("rtk: invalid extra_drop_pattern '{}': {}", p, e);
+                false
             }
-        }
+        })
+        .map(|s| s.as_str())
+        .collect();
+    if valid.is_empty() {
+        None
+    } else {
+        RegexSet::new(&valid).ok()
     }
-    compiled
 }
 
 /// Core filter logic, testable with explicit extra patterns.
-pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -> String {
+pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &Option<RegexSet>) -> String {
     let mut result = Vec::new();
     let mut in_try_block = false;
 
@@ -121,8 +128,8 @@ pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -
             continue;
         }
 
-        // Check against built-in noise patterns (use ANSI-stripped text)
-        if NOISE_PATTERNS.iter().any(|re| re.is_match(clean_trimmed)) {
+        // Check against built-in noise patterns (single-pass RegexSet match)
+        if NOISE_SET.is_match(clean_trimmed) {
             continue;
         }
 
@@ -132,7 +139,10 @@ pub fn apply_global_filters_with_extras(input: &str, extra_patterns: &[Regex]) -
         }
 
         // Check against extra user-supplied patterns
-        if extra_patterns.iter().any(|re| re.is_match(clean_trimmed)) {
+        if extra_patterns
+            .as_ref()
+            .map_or(false, |set| set.is_match(clean_trimmed))
+        {
             continue;
         }
 
@@ -211,7 +221,7 @@ mod tests {
     #[test]
     fn test_try_block_removal() {
         let input = "Some content\n\n* Try:\n> Run with --stacktrace option.\n> Run with --info option.\n> Run with --scan.\n> Get more help at https://help.gradle.org.\n\n* What went wrong:\nSomething failed";
-        let output = apply_global_filters_with_extras(input, &[]);
+        let output = apply_global_filters_with_extras(input, &None);
         assert!(!output.contains("* Try:"), "Try block should be removed");
         assert!(
             !output.contains("--stacktrace"),
@@ -226,7 +236,7 @@ mod tests {
     #[test]
     fn test_note_lines_dropped() {
         let input = "Note: Some input files use unchecked or unsafe operations.\nNote: Recompile with -Xlint:unchecked for details.\nBUILD SUCCESSFUL in 1s";
-        let output = apply_global_filters_with_extras(input, &[]);
+        let output = apply_global_filters_with_extras(input, &None);
         assert!(!output.contains("Note:"), "Note: lines should be dropped");
         assert!(output.contains("BUILD SUCCESSFUL"));
     }
@@ -234,14 +244,14 @@ mod tests {
     #[test]
     fn test_build_result_always_kept() {
         let input = "Starting Gradle Daemon...\nBUILD SUCCESSFUL in 12s\n8 actionable tasks: 1 executed, 7 up-to-date";
-        let output = apply_global_filters_with_extras(input, &[]);
+        let output = apply_global_filters_with_extras(input, &None);
         assert!(output.contains("BUILD SUCCESSFUL"));
     }
 
     #[test]
     fn test_failure_header_kept() {
         let input = "FAILURE: Build failed with an exception\n\n* What went wrong:\nCompilation failed\n\nBUILD FAILED in 5s";
-        let output = apply_global_filters_with_extras(input, &[]);
+        let output = apply_global_filters_with_extras(input, &None);
         assert!(output.contains("FAILURE: Build failed with an exception"));
         assert!(output.contains("* What went wrong:"));
         assert!(output.contains("BUILD FAILED"));
@@ -261,13 +271,24 @@ mod tests {
     fn test_invalid_extra_pattern_skipped() {
         let patterns = vec!["[invalid".to_string(), "^valid$".to_string()];
         let compiled = compile_extra_patterns(&patterns);
-        assert_eq!(compiled.len(), 1, "Invalid pattern should be skipped");
+        assert!(
+            compiled.is_some(),
+            "Should produce a RegexSet with the valid pattern"
+        );
+        assert!(
+            compiled.as_ref().unwrap().is_match("valid"),
+            "Valid pattern should match"
+        );
+        assert!(
+            !compiled.as_ref().unwrap().is_match("no match"),
+            "Should not match arbitrary text"
+        );
     }
 
     #[test]
     fn test_blank_line_trimming() {
         let input = "\n\n\nBUILD SUCCESSFUL in 1s\n\n\n";
-        let output = apply_global_filters_with_extras(input, &[]);
+        let output = apply_global_filters_with_extras(input, &None);
         assert!(!output.starts_with('\n'));
         assert!(!output.ends_with('\n'));
         assert!(output.contains("BUILD SUCCESSFUL"));
