@@ -18,17 +18,6 @@ pub fn matches_task(task_name: &str) -> bool {
         || t.starts_with("connected")
 }
 
-/// Returns true if the task name specifically refers to an integration/component/instrumented test.
-/// Used to enable integration-specific noise filtering (Hibernate, Spring, etc.)
-/// Case-insensitive: callers may pass lowercase (CLI args) or original casing.
-pub fn is_integration_task_name(task_name: &str) -> bool {
-    let t = task_name.to_ascii_lowercase();
-    t == "integrationtest"
-        || t == "componenttest"
-        || t.contains("androidtest")
-        || t.starts_with("connected")
-}
-
 /// Built-in framework prefixes that are always dropped from stack traces.
 /// These are JDK/Kotlin stdlib and internal packages — universally noise.
 const BUILTIN_FRAMEWORK_PREFIXES: &[&str] = &[
@@ -91,7 +80,7 @@ fn build_framework_regex(drop_frame_packages: &[String]) -> Regex {
 }
 
 /// Apply TEST-specific filtering on top of globally-filtered output.
-pub fn filter_test(input: &str, _is_integration: bool) -> String {
+pub fn filter_test(input: &str) -> String {
     let (user_packages, drop_frame_packages) = load_config();
     filter_test_with_config(input, &user_packages, &drop_frame_packages)
 }
@@ -108,11 +97,7 @@ fn load_config() -> (Vec<String>, Vec<String>) {
 }
 
 /// Core test filter logic, testable with explicit config.
-pub fn filter_test_with_packages(
-    input: &str,
-    _is_integration: bool,
-    user_packages: &[String],
-) -> String {
+pub fn filter_test_with_packages(input: &str, user_packages: &[String]) -> String {
     let drop_frame_packages = crate::config::default_drop_frame_packages();
     filter_test_with_config(input, user_packages, &drop_frame_packages)
 }
@@ -399,21 +384,6 @@ mod tests {
         assert!(matches_task("connectedAndroidTest"));
     }
 
-    // --- is_integration_task_name tests ---
-
-    #[test]
-    fn test_integration_task_name_positive() {
-        assert!(is_integration_task_name("integrationTest"));
-        assert!(is_integration_task_name("componentTest"));
-        assert!(is_integration_task_name("connectedDebugAndroidTest"));
-    }
-
-    #[test]
-    fn test_integration_task_name_negative() {
-        assert!(!is_integration_task_name("test"));
-        assert!(!is_integration_task_name("testDebugUnitTest"));
-    }
-
     // --- build_framework_regex tests ---
 
     #[test]
@@ -463,7 +433,7 @@ mod tests {
     fn test_test_success_snapshot() {
         let input = include_str!("../../tests/fixtures/gradle/test_success_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         assert_snapshot!(output);
     }
 
@@ -471,7 +441,7 @@ mod tests {
     fn test_test_failure_snapshot() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         assert_snapshot!(output);
     }
 
@@ -479,8 +449,7 @@ mod tests {
     fn test_test_failure_with_user_packages_snapshot() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output =
-            filter_test_with_packages(&globally_filtered, false, &["com.example".to_string()]);
+        let output = filter_test_with_packages(&globally_filtered, &["com.example".to_string()]);
         assert_snapshot!(output);
     }
 
@@ -488,7 +457,7 @@ mod tests {
     fn test_integration_test_failure_snapshot() {
         let input = include_str!("../../tests/fixtures/gradle/integration_test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, true);
+        let output = filter_test(&globally_filtered);
         assert_snapshot!(output);
     }
 
@@ -496,7 +465,7 @@ mod tests {
     fn test_test_failure_token_savings() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         let input_tokens = count_tokens(input);
         let output_tokens = count_tokens(&output);
         let savings = 100.0 - (output_tokens as f64 / input_tokens as f64 * 100.0);
@@ -513,7 +482,7 @@ mod tests {
     fn test_passing_tests_dropped() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         assert!(
             !output.contains("PASSED"),
             "Passing test lines should be dropped"
@@ -524,7 +493,7 @@ mod tests {
     fn test_failures_preserved() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         assert!(output.contains("testChargeAmount FAILED"));
         assert!(output.contains("testRefundProcess FAILED"));
         assert!(output.contains("testCreateOrder FAILED"));
@@ -643,7 +612,7 @@ mod tests {
     fn test_standard_out_dropped() {
         let input = include_str!("../../tests/fixtures/gradle/test_failure_raw.txt");
         let globally_filtered = apply_global_filters(input);
-        let output = filter_test(&globally_filtered, false);
+        let output = filter_test(&globally_filtered);
         assert!(
             !output.contains("STANDARD_OUT"),
             "STANDARD_OUT header should be dropped"

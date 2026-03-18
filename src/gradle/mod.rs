@@ -111,17 +111,6 @@ pub fn detect_task_type_from_output(raw: &str) -> TaskType {
     }
 }
 
-/// Returns true if any of the given args refer to an integration/component/instrumented test task.
-pub fn is_integration_test(args: &[String]) -> bool {
-    args.iter().any(|arg| {
-        let task_name = match arg.rfind(':') {
-            Some(pos) => arg[pos + 1..].to_ascii_lowercase(),
-            None => arg.to_ascii_lowercase(),
-        };
-        test_filter::is_integration_task_name(&task_name)
-    })
-}
-
 /// Find the gradle executable: prefer ./gradlew walking up parent dirs, fall back to gradle on PATH.
 fn find_gradle_executable() -> String {
     let candidates = [
@@ -240,8 +229,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     if task_type == TaskType::Generic {
         task_type = detect_task_type_from_output(&raw);
     }
-    let is_integration = is_integration_test(args);
-    let filtered = filter_gradle_output(&raw, &task_type, is_integration);
+    let filtered = filter_gradle_output(&raw, &task_type);
 
     let exit_code = output
         .status
@@ -272,7 +260,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 }
 
 /// Apply task-type-specific filtering to gradle output.
-pub fn filter_gradle_output(raw: &str, task_type: &TaskType, is_integration: bool) -> String {
+pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
     // For batch runs (multiple executed tasks), use batch filter on raw input
     // regardless of detected task type — batch filter splits by task boundaries
     // and applies per-section filters, preserving per-task context.
@@ -285,7 +273,7 @@ pub fn filter_gradle_output(raw: &str, task_type: &TaskType, is_integration: boo
 
     match task_type {
         TaskType::Compile => compile::filter_compile(&filtered),
-        TaskType::Test => test_filter::filter_test(&filtered, is_integration),
+        TaskType::Test => test_filter::filter_test(&filtered),
         TaskType::Detekt => detekt::filter_detekt(&filtered),
         TaskType::Health => health::filter_health(&filtered),
         TaskType::Proto => proto::filter_proto(&filtered),
@@ -589,30 +577,6 @@ mod tests {
         assert_eq!(detect_task_type_from_output(output), TaskType::Generic);
     }
 
-    // --- is_integration_test tests ---
-
-    #[test]
-    fn test_is_integration_test_positive() {
-        let args = vec![":app:billing:integrationTest".to_string()];
-        assert!(is_integration_test(&args));
-    }
-
-    #[test]
-    fn test_is_integration_test_negative() {
-        let args = vec![":app:billing:test".to_string()];
-        assert!(!is_integration_test(&args));
-    }
-
-    #[test]
-    fn test_is_integration_test_mixed_args() {
-        let args = vec![
-            "--continue".to_string(),
-            ":app:billing:integrationTest".to_string(),
-            "--info".to_string(),
-        ];
-        assert!(is_integration_test(&args));
-    }
-
     // --- case-insensitive matching tests ---
 
     #[test]
@@ -649,12 +613,6 @@ mod tests {
     fn test_detect_case_insensitive_build_protos() {
         let args = vec![":app:billing:BuildProtos".to_string()];
         assert_eq!(detect_task_type(&args), TaskType::Proto);
-    }
-
-    #[test]
-    fn test_is_integration_test_case_insensitive() {
-        let args = vec![":app:billing:IntegrationTest".to_string()];
-        assert!(is_integration_test(&args));
     }
 
     // --- stderr noise filtering tests ---
