@@ -3,6 +3,7 @@ pub mod detekt;
 pub mod global;
 pub mod health;
 pub mod paths;
+pub mod proto;
 pub mod test_filter;
 
 use crate::tracking;
@@ -261,6 +262,7 @@ pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
         TaskType::Test => test_filter::filter_test(&filtered),
         TaskType::Detekt => detekt::filter_detekt(&filtered),
         TaskType::Health => health::filter_health(&filtered),
+        TaskType::Proto => proto::filter_proto(&filtered),
         TaskType::Generic => filtered,
         // Per-task filters added in subsequent PRs
         _ => filtered,
