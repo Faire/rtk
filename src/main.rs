@@ -22,6 +22,7 @@ mod gh_cmd;
 mod git;
 mod go_cmd;
 mod golangci_cmd;
+mod gradle;
 mod grep_cmd;
 mod gt_cmd;
 mod hook_audit_cmd;
@@ -644,6 +645,13 @@ enum Commands {
     /// Pip package manager with compact output (auto-detects uv)
     Pip {
         /// Pip arguments (e.g., list, outdated, install)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// Gradle commands with filtered output (compile, test, detekt, health, proto, deps)
+    Gradle {
+        /// Gradle arguments (task names, flags -- all passed through)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
@@ -1990,6 +1998,10 @@ fn main() -> Result<()> {
             pip_cmd::run(&args, cli.verbose)?;
         }
 
+        Commands::Gradle { args } => {
+            gradle::run(&args, cli.verbose)?;
+        }
+
         Commands::Go { command } => match command {
             GoCommands::Test { args } => {
                 go_cmd::run_test(&args, cli.verbose)?;
@@ -2247,6 +2259,7 @@ fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Pytest { .. }
             | Commands::Pip { .. }
             | Commands::Go { .. }
+            | Commands::Gradle { .. }
             | Commands::GolangciLint { .. }
             | Commands::Gt { .. }
     )
@@ -2562,6 +2575,20 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_gradle_clap_parses_task_and_flags() {
+        let cli = Cli::try_parse_from([
+            "rtk",
+            "gradle",
+            ":backend:backend-payments:test",
+            "--tests",
+            "com.example.FooTest",
+            "--info",
+        ])
+        .expect("should parse");
+        assert!(matches!(cli.command, Commands::Gradle { .. }));
     }
 
     #[test]
