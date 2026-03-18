@@ -191,11 +191,7 @@ fn detect_task_type_from_name(task_name: &str) -> TaskType {
 fn filter_section_content(content: &str, task_type: &TaskType, task_name: &str) -> String {
     match task_type {
         TaskType::Compile => compile::filter_compile(content),
-        TaskType::Test => {
-            let name = task_name.rsplit(':').next().unwrap_or(task_name);
-            let is_integration = test_filter::is_integration_task_name(name);
-            test_filter::filter_test(content, is_integration)
-        }
+        TaskType::Test => test_filter::filter_test(content),
         TaskType::Detekt => detekt::filter_detekt(content),
         _ => content.to_string(),
     }
