@@ -2,6 +2,7 @@ mod analytics;
 mod cmds;
 mod core;
 mod discover;
+mod gradle;
 mod hooks;
 mod learn;
 mod parser;
