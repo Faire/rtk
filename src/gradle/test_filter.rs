@@ -18,17 +18,6 @@ pub fn matches_task(task_name: &str) -> bool {
         || t.starts_with("connected")
 }
 
-/// Returns true if the task name specifically refers to an integration/component/instrumented test.
-/// Used to enable integration-specific noise filtering (Hibernate, Spring, etc.)
-/// Case-insensitive: callers may pass lowercase (CLI args) or original casing.
-fn is_integration_task_name(task_name: &str) -> bool {
-    let t = task_name.to_ascii_lowercase();
-    t == "integrationtest"
-        || t == "componenttest"
-        || t.contains("androidtest")
-        || t.starts_with("connected")
-}
-
 /// Built-in framework prefixes that are always dropped from stack traces.
 /// These are JDK/Kotlin stdlib and internal packages — universally noise.
 const BUILTIN_FRAMEWORK_PREFIXES: &[&str] = &[
@@ -393,21 +382,6 @@ mod tests {
     fn test_matches_connected_android_test() {
         assert!(matches_task("connectedDebugAndroidTest"));
         assert!(matches_task("connectedAndroidTest"));
-    }
-
-    // --- is_integration_task_name tests ---
-
-    #[test]
-    fn test_integration_task_name_positive() {
-        assert!(is_integration_task_name("integrationTest"));
-        assert!(is_integration_task_name("componentTest"));
-        assert!(is_integration_task_name("connectedDebugAndroidTest"));
-    }
-
-    #[test]
-    fn test_integration_task_name_negative() {
-        assert!(!is_integration_task_name("test"));
-        assert!(!is_integration_task_name("testDebugUnitTest"));
     }
 
     // --- build_framework_regex tests ---
