@@ -22,6 +22,7 @@ mod gh_cmd;
 mod git;
 mod go_cmd;
 mod golangci_cmd;
+mod gradle;
 mod grep_cmd;
 mod gt_cmd;
 mod hook_audit_cmd;
