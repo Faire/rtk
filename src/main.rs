@@ -635,6 +635,13 @@ enum Commands {
         args: Vec<String>,
     },
 
+    /// Gradle commands with filtered output (compile, test, detekt, health, proto, deps)
+    Gradle {
+        /// Gradle arguments (task names, flags -- all passed through)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
     /// Go commands with compact output
     Go {
         #[command(subcommand)]
@@ -2007,6 +2014,10 @@ fn main() -> Result<()> {
             pip_cmd::run(&args, cli.verbose)?;
         }
 
+        Commands::Gradle { args } => {
+            gradle::run(&args, cli.verbose)?;
+        }
+
         Commands::Go { command } => match command {
             GoCommands::Test { args } => {
                 go_cmd::run_test(&args, cli.verbose)?;
@@ -2267,6 +2278,7 @@ fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Rspec { .. }
             | Commands::Pip { .. }
             | Commands::Go { .. }
+            | Commands::Gradle { .. }
             | Commands::GolangciLint { .. }
             | Commands::Gt { .. }
     )
@@ -2585,6 +2597,20 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn test_gradle_clap_parses_task_and_flags() {
+        let cli = Cli::try_parse_from([
+            "rtk",
+            "gradle",
+            ":backend:backend-payments:test",
+            "--tests",
+            "com.example.FooTest",
+            "--info",
+        ])
+        .expect("should parse");
+        assert!(matches!(cli.command, Commands::Gradle { .. }));
+    }
+
     fn test_rewrite_clap_quoted_single_arg() {
         // Quoted form: `rtk rewrite "git status"` — single arg containing spaces
         let result = Cli::try_parse_from(["rtk", "rewrite", "git status"]);
