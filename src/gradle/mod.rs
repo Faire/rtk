@@ -125,13 +125,24 @@ fn find_gradle_executable() -> String {
 
 /// Normalize gradle args in one pass:
 /// - Strip `--quiet`/`-q` (suppresses parseable output)
-/// - Append `--console plain` (caller must reject non-plain `--console` before this)
+/// - Strip existing `--console <value>` (caller already rejected non-plain values)
+/// - Append `--console plain`
 fn normalize_args(args: &[String]) -> Vec<String> {
     let mut result = Vec::with_capacity(args.len() + 2);
+    let mut skip_next = false;
 
     for arg in args {
+        if skip_next {
+            skip_next = false;
+            continue;
+        }
         match arg.as_str() {
             "--quiet" | "-q" => continue,
+            "--console" => {
+                skip_next = true; // skip the following value
+                continue;
+            }
+            _ if arg.starts_with("--console=") => continue,
             _ => result.push(arg.clone()),
         }
     }
@@ -326,6 +337,25 @@ mod tests {
         let args = vec![":app:test".to_string(), "--continue".to_string()];
         let result = normalize_args(&args);
         assert!(result.ends_with(&["--console".to_string(), "plain".to_string()]));
+    }
+
+    #[test]
+    fn test_normalize_deduplicates_console_plain() {
+        let args = vec![
+            ":app:test".to_string(),
+            "--console".to_string(),
+            "plain".to_string(),
+            "--quiet".to_string(),
+        ];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
+    }
+
+    #[test]
+    fn test_normalize_deduplicates_console_equals_plain() {
+        let args = vec![":app:test".to_string(), "--console=plain".to_string()];
+        let result = normalize_args(&args);
+        assert_eq!(result, vec![":app:test", "--console", "plain"]);
     }
 
     // --- find_non_plain_console tests ---
