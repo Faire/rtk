@@ -33,10 +33,8 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
             run_passthrough(base_cmd, args, verbose)?
         }
         _ => {
-            anyhow::bail!(
-                "rtk pip: unsupported subcommand '{}'\nSupported: list, outdated, install, uninstall, show",
-                subcommand
-            );
+            // Unknown subcommand: passthrough to pip/uv
+            run_passthrough(base_cmd, args, verbose)?
         }
     };
 
@@ -208,7 +206,7 @@ fn filter_pip_outdated(output: &str) -> String {
     };
 
     if packages.is_empty() {
-        return "✓ pip outdated: All packages up to date".to_string();
+        return "pip outdated: All packages up to date".to_string();
     }
 
     let mut result = String::new();
@@ -216,11 +214,7 @@ fn filter_pip_outdated(output: &str) -> String {
     result.push_str("═══════════════════════════════════════\n");
 
     for (i, pkg) in packages.iter().take(20).enumerate() {
-        let latest = pkg
-            .latest_version
-            .as_ref()
-            .map(|v| v.as_str())
-            .unwrap_or("unknown");
+        let latest = pkg.latest_version.as_deref().unwrap_or("unknown");
         result.push_str(&format!(
             "{}. {} ({} → {})\n",
             i + 1,
@@ -234,7 +228,7 @@ fn filter_pip_outdated(output: &str) -> String {
         result.push_str(&format!("\n... +{} more packages\n", packages.len() - 20));
     }
 
-    result.push_str("\n💡 Run `pip install --upgrade <package>` to update\n");
+    result.push_str("\n[hint] Run `pip install --upgrade <package>` to update\n");
 
     result.trim().to_string()
 }
@@ -269,7 +263,6 @@ mod tests {
     fn test_filter_pip_outdated_none() {
         let output = "[]";
         let result = filter_pip_outdated(output);
-        assert!(result.contains("✓"));
         assert!(result.contains("All packages up to date"));
     }
 

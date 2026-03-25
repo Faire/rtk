@@ -112,6 +112,7 @@ fn build_command() -> Option<Command> {
 }
 
 /// Check if ccusage CLI is available (binary or via npx)
+#[allow(dead_code)]
 pub fn is_available() -> bool {
     build_command().is_some()
 }
@@ -125,7 +126,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
     let mut cmd = match build_command() {
         Some(cmd) => cmd,
         None => {
-            eprintln!("⚠️  ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
+            eprintln!("[warn] ccusage not found. Install: npm i -g ccusage (or use npx ccusage)");
             return Ok(None);
         }
     };
@@ -145,7 +146,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
 
     let output = match output {
         Err(e) => {
-            eprintln!("⚠️  ccusage execution failed: {}", e);
+            eprintln!("[warn] ccusage execution failed: {}", e);
             return Ok(None);
         }
         Ok(o) => o,
@@ -154,7 +155,7 @@ pub fn fetch(granularity: Granularity) -> Result<Option<Vec<CcusagePeriod>>> {
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         eprintln!(
-            "⚠️  ccusage exited with {}: {}",
+            "[warn] ccusage exited with {}: {}",
             output.status,
             stderr.trim()
         );
