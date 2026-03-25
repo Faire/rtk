@@ -1,3 +1,4 @@
+use crate::config;
 use crate::tracking;
 use crate::utils::{resolved_command, truncate};
 use anyhow::{Context, Result};
@@ -6,7 +7,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 struct RuffLocation {
+    #[allow(dead_code)]
     row: usize,
+    #[allow(dead_code)]
     column: usize,
 }
 
@@ -19,7 +22,9 @@ struct RuffFix {
 #[derive(Debug, Deserialize)]
 struct RuffDiagnostic {
     code: String,
+    #[allow(dead_code)]
     message: String,
+    #[allow(dead_code)]
     location: RuffLocation,
     #[allow(dead_code)]
     end_location: Option<RuffLocation>,
@@ -121,13 +126,13 @@ pub fn filter_ruff_check_json(output: &str) -> String {
             return format!(
                 "Ruff check (JSON parse failed: {})\n{}",
                 e,
-                truncate(output, 500)
+                truncate(output, config::limits().passthrough_max_chars)
             );
         }
     };
 
     if diagnostics.is_empty() {
-        return "✓ Ruff: No issues found".to_string();
+        return "Ruff: No issues found".to_string();
     }
 
     let total_issues = diagnostics.len();
@@ -204,7 +209,7 @@ pub fn filter_ruff_check_json(output: &str) -> String {
 
     if fixable_count > 0 {
         result.push_str(&format!(
-            "\n💡 Run `ruff check --fix` to auto-fix {} issues\n",
+            "\n[hint] Run `ruff check --fix` to auto-fix {} issues\n",
             fixable_count
         ));
     }
@@ -237,7 +242,7 @@ pub fn filter_ruff_format(output: &str) -> String {
             for part in parts {
                 let part_lower = part.to_lowercase();
                 if part_lower.contains("left unchanged") {
-                    let words: Vec<&str> = part.trim().split_whitespace().collect();
+                    let words: Vec<&str> = part.split_whitespace().collect();
                     // Look for number before "file" or "files"
                     for (i, word) in words.iter().enumerate() {
                         if (word == &"file" || word == &"files") && i > 0 {
@@ -257,7 +262,7 @@ pub fn filter_ruff_format(output: &str) -> String {
 
     // Check if all files are formatted
     if files_to_format.is_empty() && output_lower.contains("left unchanged") {
-        return "✓ Ruff format: All files formatted correctly".to_string();
+        return "Ruff format: All files formatted correctly".to_string();
     }
 
     let mut result = String::new();
@@ -265,7 +270,7 @@ pub fn filter_ruff_format(output: &str) -> String {
     if output_lower.contains("would reformat") {
         // Check mode: show files that need formatting
         if files_to_format.is_empty() {
-            result.push_str("✓ Ruff format: All files formatted correctly\n");
+            result.push_str("Ruff format: All files formatted correctly\n");
         } else {
             result.push_str(&format!(
                 "Ruff format: {} files need formatting\n",
@@ -285,10 +290,10 @@ pub fn filter_ruff_format(output: &str) -> String {
             }
 
             if files_checked > 0 {
-                result.push_str(&format!("\n✓ {} files already formatted\n", files_checked));
+                result.push_str(&format!("\n{} files already formatted\n", files_checked));
             }
 
-            result.push_str("\n💡 Run `ruff format` to format these files\n");
+            result.push_str("\n[hint] Run `ruff format` to format these files\n");
         }
     } else {
         // Write mode or other output - show summary
@@ -323,7 +328,7 @@ mod tests {
     fn test_filter_ruff_check_no_issues() {
         let output = "[]";
         let result = filter_ruff_check_json(output);
-        assert!(result.contains("✓ Ruff"));
+        assert!(result.contains("Ruff"));
         assert!(result.contains("No issues found"));
     }
 
@@ -369,7 +374,7 @@ mod tests {
     fn test_filter_ruff_format_all_formatted() {
         let output = "5 files left unchanged";
         let result = filter_ruff_format(output);
-        assert!(result.contains("✓ Ruff format"));
+        assert!(result.contains("Ruff format"));
         assert!(result.contains("All files formatted correctly"));
     }
 

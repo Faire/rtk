@@ -168,7 +168,7 @@ fn filter_black_output(output: &str) -> String {
             // Split by comma to handle both parts
             for part in trimmed.split(',') {
                 let part_lower = part.to_lowercase();
-                let words: Vec<&str> = part.trim().split_whitespace().collect();
+                let words: Vec<&str> = part.split_whitespace().collect();
 
                 if part_lower.contains("would be reformatted") {
                     // Parse "X file(s) would be reformatted"
@@ -226,7 +226,7 @@ fn filter_black_output(output: &str) -> String {
 
     if !needs_formatting && (all_done || files_unchanged > 0) {
         // All files formatted correctly
-        result.push_str("✓ Format (black): All files formatted");
+        result.push_str("Format (black): All files formatted");
         if files_unchanged > 0 {
             result.push_str(&format!(" ({} files checked)", files_unchanged));
         }
@@ -258,13 +258,10 @@ fn filter_black_output(output: &str) -> String {
         }
 
         if files_unchanged > 0 {
-            result.push_str(&format!(
-                "\n✓ {} files already formatted\n",
-                files_unchanged
-            ));
+            result.push_str(&format!("\n{} files already formatted\n", files_unchanged));
         }
 
-        result.push_str("\n💡 Run `black .` to format these files\n");
+        result.push_str("\n[hint] Run `black .` to format these files\n");
     } else {
         // Fallback: show raw output
         result.push_str(output.trim());
@@ -349,7 +346,7 @@ mod tests {
     fn test_filter_black_all_formatted() {
         let output = "All done! ✨ 🍰 ✨\n5 files left unchanged.";
         let result = filter_black_output(output);
-        assert!(result.contains("✓ Format (black)"));
+        assert!(result.contains("Format (black)"));
         assert!(result.contains("All files formatted"));
         assert!(result.contains("5 files checked"));
     }

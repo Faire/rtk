@@ -27,6 +27,7 @@ mod grep_cmd;
 mod gt_cmd;
 mod hook_audit_cmd;
 mod hook_check;
+mod hook_cmd;
 mod init;
 mod integrity;
 mod json_cmd;
@@ -39,6 +40,7 @@ mod mypy_cmd;
 mod next_cmd;
 mod npm_cmd;
 mod parser;
+mod permissions;
 mod pip_cmd;
 mod playwright_cmd;
 mod pnpm_cmd;
@@ -46,8 +48,11 @@ mod prettier_cmd;
 mod prisma_cmd;
 mod psql_cmd;
 mod pytest_cmd;
+mod rake_cmd;
 mod read;
 mod rewrite_cmd;
+mod rspec_cmd;
+mod rubocop_cmd;
 mod ruff_cmd;
 mod runner;
 mod session_cmd;
@@ -67,9 +72,22 @@ mod wget_cmd;
 
 use anyhow::{Context, Result};
 use clap::error::ErrorKind;
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+
+/// Target agent for hook installation.
+#[derive(Debug, Clone, Copy, PartialEq, ValueEnum)]
+pub enum AgentTarget {
+    /// Claude Code (default)
+    Claude,
+    /// Cursor Agent (editor and CLI)
+    Cursor,
+    /// Windsurf IDE (Cascade)
+    Windsurf,
+    /// Cline / Roo Code (VS Code)
+    Cline,
+}
 
 #[derive(Parser)]
 #[command(
@@ -224,13 +242,16 @@ enum Commands {
         command: Vec<String>,
     },
 
-    /// Show JSON structure without values
+    /// Show JSON (compact values, or schema-only with --schema)
     Json {
         /// JSON file
         file: PathBuf,
         /// Max depth
         #[arg(short, long, default_value = "5")]
         depth: usize,
+        /// Show structure only (strip all values)
+        #[arg(long)]
+        schema: bool,
     },
 
     /// Summarize project dependencies
@@ -307,7 +328,7 @@ enum Commands {
         #[arg(short = 'l', long, default_value = "80")]
         max_len: usize,
         /// Max results to show
-        #[arg(short, long, default_value = "50")]
+        #[arg(short, long, default_value = "200")]
         max: usize,
         /// Show only match context (not full line)
         #[arg(short, long)]
@@ -323,15 +344,23 @@ enum Commands {
         extra_args: Vec<String>,
     },
 
-    /// Initialize rtk instructions in CLAUDE.md
+    /// Initialize rtk instructions for assistant CLI usage
     Init {
-        /// Add to global ~/.claude/CLAUDE.md instead of local
+        /// Add to global assistant config directory instead of local project file
         #[arg(short, long)]
         global: bool,
 
         /// Install OpenCode plugin (in addition to Claude Code)
         #[arg(long)]
         opencode: bool,
+
+        /// Initialize for Gemini CLI instead of Claude Code
+        #[arg(long)]
+        gemini: bool,
+
+        /// Target agent to install hooks for (default: claude)
+        #[arg(long, value_enum)]
+        agent: Option<AgentTarget>,
 
         /// Show current configuration
         #[arg(long)]
@@ -353,18 +382,22 @@ enum Commands {
         #[arg(long = "no-patch", group = "patch")]
         no_patch: bool,
 
-        /// Remove all RTK artifacts (hook, RTK.md, CLAUDE.md reference, settings.json entry)
+        /// Remove RTK artifacts for the selected assistant mode
         #[arg(long)]
         uninstall: bool,
+
+        /// Target Codex CLI (uses AGENTS.md + RTK.md, no Claude hook patching)
+        #[arg(long)]
+        codex: bool,
     },
 
     /// Download with compact output (strips progress bars)
     Wget {
         /// URL to download
         url: String,
-        /// Output to stdout instead of file
-        #[arg(short = 'O', long)]
-        stdout: bool,
+        /// Output file (-O - for stdout)
+        #[arg(short = 'O', long = "output-document", allow_hyphen_values = true)]
+        output: Option<String>,
         /// Additional wget arguments
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
@@ -616,6 +649,27 @@ enum Commands {
         args: Vec<String>,
     },
 
+    /// Rake/Rails test with compact Minitest output (Ruby)
+    Rake {
+        /// Rake arguments (e.g., test, test TEST=path/to/test.rb)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// RuboCop linter with compact output (Ruby)
+    Rubocop {
+        /// RuboCop arguments (e.g., --auto-correct, -A)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
+    /// RSpec test runner with compact output (Rails/Ruby)
+    Rspec {
+        /// RSpec arguments (e.g., spec/models, --tag focus)
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+
     /// Pip package manager with compact output (auto-detects uv)
     Pip {
         /// Pip arguments (e.g., list, outdated, install)
@@ -671,6 +725,20 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+
+    /// Hook processors for LLM CLI tools (Gemini CLI, Copilot, etc.)
+    Hook {
+        #[command(subcommand)]
+        command: HookCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum HookCommands {
+    /// Process Gemini CLI BeforeTool hook (reads JSON from stdin)
+    Gemini,
+    /// Process Copilot preToolUse hook (VS Code + Copilot CLI, reads JSON from stdin)
+    Copilot,
 }
 
 #[derive(Subcommand)]
@@ -699,25 +767,25 @@ enum GitCommands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Add files → "ok ✓"
+    /// Add files → "ok"
     Add {
         /// Files and flags to add (supports all git add flags like -A, -p, --all, etc)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Commit → "ok ✓ \<hash\>"
+    /// Commit → "ok \<hash\>"
     Commit {
         /// Git commit arguments (supports -a, -m, --amend, --allow-empty, etc)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Push → "ok ✓ \<branch\>"
+    /// Push → "ok \<branch\>"
     Push {
         /// Git push arguments (supports -u, remote, branch, etc.)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Pull → "ok ✓ \<stats\>"
+    /// Pull → "ok \<stats\>"
     Pull {
         /// Git pull arguments (supports --rebase, remote, branch, etc.)
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
@@ -1187,11 +1255,11 @@ enum GtCommands {
 fn shell_split(input: &str) -> Vec<String> {
     let mut tokens = Vec::new();
     let mut current = String::new();
-    let mut chars = input.chars().peekable();
+    let chars = input.chars();
     let mut in_single = false;
     let mut in_double = false;
 
-    while let Some(c) = chars.next() {
+    for c in chars {
         match c {
             '\'' if !in_double => in_single = !in_single,
             '"' if !in_single => in_double = !in_double,
@@ -1469,11 +1537,15 @@ fn main() -> Result<()> {
             runner::run_test(&cmd, cli.verbose)?;
         }
 
-        Commands::Json { file, depth } => {
+        Commands::Json {
+            file,
+            depth,
+            schema,
+        } => {
             if file == Path::new("-") {
-                json_cmd::run_stdin(depth, cli.verbose)?;
+                json_cmd::run_stdin(depth, schema, cli.verbose)?;
             } else {
-                json_cmd::run(&file, depth, cli.verbose)?;
+                json_cmd::run(&file, depth, schema, cli.verbose)?;
             }
         }
 
@@ -1616,20 +1688,36 @@ fn main() -> Result<()> {
         Commands::Init {
             global,
             opencode,
+            gemini,
+            agent,
             show,
             claude_md,
             hook_only,
             auto_patch,
             no_patch,
             uninstall,
+            codex,
         } => {
             if show {
-                init::show_config()?;
+                init::show_config(codex)?;
             } else if uninstall {
-                init::uninstall(global, cli.verbose)?;
+                let cursor = agent == Some(AgentTarget::Cursor);
+                init::uninstall(global, gemini, codex, cursor, cli.verbose)?;
+            } else if gemini {
+                let patch_mode = if auto_patch {
+                    init::PatchMode::Auto
+                } else if no_patch {
+                    init::PatchMode::Skip
+                } else {
+                    init::PatchMode::Ask
+                };
+                init::run_gemini(global, hook_only, patch_mode, cli.verbose)?;
             } else {
                 let install_opencode = opencode;
                 let install_claude = !opencode;
+                let install_cursor = agent == Some(AgentTarget::Cursor);
+                let install_windsurf = agent == Some(AgentTarget::Windsurf);
+                let install_cline = agent == Some(AgentTarget::Cline);
 
                 let patch_mode = if auto_patch {
                     init::PatchMode::Auto
@@ -1642,19 +1730,30 @@ fn main() -> Result<()> {
                     global,
                     install_claude,
                     install_opencode,
+                    install_cursor,
+                    install_windsurf,
+                    install_cline,
                     claude_md,
                     hook_only,
+                    codex,
                     patch_mode,
                     cli.verbose,
                 )?;
             }
         }
 
-        Commands::Wget { url, stdout, args } => {
-            if stdout {
+        Commands::Wget { url, output, args } => {
+            if output.as_deref() == Some("-") {
                 wget_cmd::run_stdout(&url, &args, cli.verbose)?;
             } else {
-                wget_cmd::run(&url, &args, cli.verbose)?;
+                // Pass -O <file> through to wget via args
+                let mut all_args = Vec::new();
+                if let Some(out_file) = &output {
+                    all_args.push("-O".to_string());
+                    all_args.push(out_file.clone());
+                }
+                all_args.extend(args);
+                wget_cmd::run(&url, &all_args, cli.verbose)?;
             }
         }
 
@@ -1934,6 +2033,18 @@ fn main() -> Result<()> {
             mypy_cmd::run(&args, cli.verbose)?;
         }
 
+        Commands::Rake { args } => {
+            rake_cmd::run(&args, cli.verbose)?;
+        }
+
+        Commands::Rubocop { args } => {
+            rubocop_cmd::run(&args, cli.verbose)?;
+        }
+
+        Commands::Rspec { args } => {
+            rspec_cmd::run(&args, cli.verbose)?;
+        }
+
         Commands::Pip { args } => {
             pip_cmd::run(&args, cli.verbose)?;
         }
@@ -1988,6 +2099,15 @@ fn main() -> Result<()> {
         Commands::HookAudit { since } => {
             hook_audit_cmd::run(since, cli.verbose)?;
         }
+
+        Commands::Hook { command } => match command {
+            HookCommands::Gemini => {
+                hook_cmd::run_gemini()?;
+            }
+            HookCommands::Copilot => {
+                hook_cmd::run_copilot()?;
+            }
+        },
 
         Commands::Rewrite { args } => {
             let cmd = args.join(" ");
@@ -2188,6 +2308,9 @@ fn is_operational_command(cmd: &Commands) -> bool {
             | Commands::Curl { .. }
             | Commands::Ruff { .. }
             | Commands::Pytest { .. }
+            | Commands::Rake { .. }
+            | Commands::Rubocop { .. }
+            | Commands::Rspec { .. }
             | Commands::Pip { .. }
             | Commands::Go { .. }
             | Commands::Gradle { .. }
