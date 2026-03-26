@@ -1,3 +1,4 @@
+pub mod compile;
 pub mod global;
 pub mod paths;
 
@@ -19,7 +20,8 @@ pub enum TaskType {
 /// Registry of task type matchers, checked in priority order.
 /// Registry of task type matchers, checked in priority order.
 /// Per-module matchers added as filters land in subsequent PRs.
-const TASK_TYPE_REGISTRY: &[(fn(&str) -> bool, TaskType)] = &[];
+const TASK_TYPE_REGISTRY: &[(fn(&str) -> bool, TaskType)] =
+    &[(compile::matches_task, TaskType::Compile)];
 
 /// Detect the task type from gradle arguments.
 ///
@@ -252,6 +254,7 @@ pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
     let filtered = global::apply_global_filters(raw);
 
     match task_type {
+        TaskType::Compile => compile::filter_compile(&filtered),
         TaskType::Generic => filtered,
         // Per-task filters added in subsequent PRs
         _ => filtered,
