@@ -1,4 +1,5 @@
 pub mod compile;
+pub mod deps;
 pub mod detekt;
 pub mod global;
 pub mod health;
@@ -263,9 +264,8 @@ pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
         TaskType::Detekt => detekt::filter_detekt(&filtered),
         TaskType::Health => health::filter_health(&filtered),
         TaskType::Proto => proto::filter_proto(&filtered),
+        TaskType::Deps => deps::filter_deps(&filtered),
         TaskType::Generic => filtered,
-        // Per-task filters added in subsequent PRs
-        _ => filtered,
     }
 }
 
