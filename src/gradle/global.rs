@@ -1,4 +1,4 @@
-use crate::utils::strip_ansi;
+use crate::core::utils::strip_ansi;
 use lazy_static::lazy_static;
 use regex::{Regex, RegexSet};
 
@@ -53,7 +53,7 @@ pub fn apply_global_filters(input: &str) -> String {
 
 /// Load extra drop patterns from config.toml [gradle] section.
 fn load_extra_patterns() -> Option<RegexSet> {
-    match crate::config::Config::load() {
+    match crate::core::config::Config::load() {
         Ok(config) => compile_extra_patterns(&config.gradle.extra_drop_patterns),
         Err(_) => None,
     }

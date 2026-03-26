@@ -87,18 +87,18 @@ pub fn filter_test(input: &str) -> String {
 
 /// Load user_packages and drop_frame_packages from config.
 fn load_config() -> (Vec<String>, Vec<String>) {
-    match crate::config::Config::load() {
+    match crate::core::config::Config::load() {
         Ok(config) => (
             config.gradle.user_packages,
             config.gradle.drop_frame_packages,
         ),
-        Err(_) => (Vec::new(), crate::config::default_drop_frame_packages()),
+        Err(_) => (Vec::new(), crate::core::config::default_drop_frame_packages()),
     }
 }
 
 /// Core test filter logic, testable with explicit config.
 pub fn filter_test_with_packages(input: &str, user_packages: &[String]) -> String {
-    let drop_frame_packages = crate::config::default_drop_frame_packages();
+    let drop_frame_packages = crate::core::config::default_drop_frame_packages();
     filter_test_with_config(input, user_packages, &drop_frame_packages)
 }
 
@@ -501,7 +501,7 @@ mod tests {
 
     #[test]
     fn test_stack_trace_truncation_basic() {
-        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
+        let re = build_framework_regex(&crate::core::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: expected:<1> but was:<2>",
             "        at org.junit.Assert.failNotEquals(Assert.java:834)",
@@ -530,7 +530,7 @@ mod tests {
 
     #[test]
     fn test_caused_by_chain() {
-        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
+        let re = build_framework_regex(&crate::core::config::default_drop_frame_packages());
         let trace = vec![
             "    org.opentest4j.AssertionFailedError: Expected failure",
             "        at org.junit.jupiter.api.Assertions.fail(Assertions.java:55)",
@@ -550,7 +550,7 @@ mod tests {
 
     #[test]
     fn test_empty_user_packages_max_truncation() {
-        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
+        let re = build_framework_regex(&crate::core::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: test failed",
             "        at org.junit.Assert.fail(Assert.java:100)",
@@ -568,7 +568,7 @@ mod tests {
     fn test_non_matching_package_keeps_unknown_frames() {
         // With user_packages=["com.acme"], com.example is NOT a user frame
         // but also NOT a framework frame — so it's kept as an unknown (potentially useful) frame
-        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
+        let re = build_framework_regex(&crate::core::config::default_drop_frame_packages());
         let trace = vec![
             "    java.lang.AssertionError: expected:<1> but was:<2>",
             "        at org.junit.Assert.failNotEquals(Assert.java:834)",
@@ -589,7 +589,7 @@ mod tests {
 
     #[test]
     fn test_user_frames_kept_after_many_framework_frames() {
-        let re = build_framework_regex(&crate::config::default_drop_frame_packages());
+        let re = build_framework_regex(&crate::core::config::default_drop_frame_packages());
         let mut trace = vec!["    java.lang.AssertionError: test failed".to_string()];
         for i in 0..10 {
             trace.push(format!(
