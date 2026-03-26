@@ -1,3 +1,4 @@
+pub mod batch;
 pub mod compile;
 pub mod deps;
 pub mod detekt;
@@ -254,8 +255,29 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
     Ok(())
 }
 
+/// Check if raw output contains multiple executed tasks (batch run).
+fn has_multiple_tasks(raw: &str) -> bool {
+    let task_count = raw
+        .lines()
+        .filter(|l| {
+            let t = l.trim();
+            t.starts_with("> Task ")
+                && !t.ends_with("UP-TO-DATE")
+                && !t.ends_with("SKIPPED")
+                && !t.ends_with("NO-SOURCE")
+                && !t.ends_with("FROM-CACHE")
+        })
+        .count();
+    task_count > 1
+}
+
 /// Apply task-type-specific filtering to gradle output.
 pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
+    if has_multiple_tasks(raw) {
+        let globally_filtered = global::apply_global_filters(raw);
+        return batch::filter_batch_from_raw(raw, &globally_filtered);
+    }
+
     let filtered = global::apply_global_filters(raw);
 
     match task_type {
