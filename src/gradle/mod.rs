@@ -1,6 +1,7 @@
 pub mod compile;
 pub mod global;
 pub mod paths;
+pub mod test_filter;
 
 use crate::tracking;
 use anyhow::{Context, Result};
@@ -255,6 +256,7 @@ pub fn filter_gradle_output(raw: &str, task_type: &TaskType) -> String {
 
     match task_type {
         TaskType::Compile => compile::filter_compile(&filtered),
+        TaskType::Test => test_filter::filter_test(&filtered),
         TaskType::Generic => filtered,
         // Per-task filters added in subsequent PRs
         _ => filtered,
