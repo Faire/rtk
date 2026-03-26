@@ -8,7 +8,7 @@ pub mod paths;
 pub mod proto;
 pub mod test_filter;
 
-use crate::tracking;
+use crate::core::tracking;
 use anyhow::{Context, Result};
 use std::process::Command;
 
@@ -243,7 +243,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         .code()
         .unwrap_or(if output.status.success() { 0 } else { 1 });
 
-    if let Some(hint) = crate::tee::tee_and_hint(&raw, "gradle", exit_code) {
+    if let Some(hint) = crate::core::tee::tee_and_hint(&raw, "gradle", exit_code) {
         println!("{}\n{}", filtered, hint);
     } else {
         println!("{}", filtered);
