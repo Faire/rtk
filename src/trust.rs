@@ -140,6 +140,7 @@ pub fn check_trust(filter_path: &Path) -> Result<TrustStatus> {
 }
 
 /// Store current SHA-256 hash as trusted (computes hash from file).
+#[allow(dead_code)]
 pub fn trust_filter(filter_path: &Path) -> Result<()> {
     let hash = integrity::compute_hash(filter_path)
         .with_context(|| format!("Failed to hash: {}", filter_path.display()))?;
@@ -267,13 +268,13 @@ fn print_risk_summary(content: &str) {
     println!("  Filters: {}", filter_count);
 
     if has_replace {
-        println!("  ⚠ Contains 'replace' rules (can rewrite output)");
+        println!("  [!] Contains 'replace' rules (can rewrite output)");
     }
     if has_match_output {
-        println!("  ⚠ Contains 'match_output' rules (can replace entire output)");
+        println!("  [!] Contains 'match_output' rules (can replace entire output)");
     }
     if has_dot_pattern {
-        println!("  ⚠ Contains catch-all pattern '.' (matches everything)");
+        println!("  [!] Contains catch-all pattern '.' (matches everything)");
     }
     if !has_replace && !has_match_output && !has_dot_pattern {
         println!("  No high-risk patterns detected.");

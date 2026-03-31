@@ -5,8 +5,8 @@ use regex::Regex;
 use serde::Deserialize;
 
 use crate::parser::{
-    emit_degradation_warning, emit_passthrough_warning, truncate_output, FormatMode, OutputParser,
-    ParseResult, TestFailure, TestResult, TokenFormatter,
+    emit_degradation_warning, emit_passthrough_warning, truncate_passthrough, FormatMode,
+    OutputParser, ParseResult, TestFailure, TestResult, TokenFormatter,
 };
 
 /// Matches real Playwright JSON reporter output (suites → specs → tests → results)
@@ -110,7 +110,7 @@ impl OutputParser for PlaywrightParser {
                     }
                     None => {
                         // Tier 3: Passthrough
-                        ParseResult::Passthrough(truncate_output(input, 500))
+                        ParseResult::Passthrough(truncate_passthrough(input))
                     }
                 }
             }
@@ -314,7 +314,12 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
         }
     };
 
-    println!("{}", filtered);
+    let exit_code = output.status.code().unwrap_or(1);
+    if let Some(hint) = crate::tee::tee_and_hint(&raw, "playwright", exit_code) {
+        println!("{}\n{}", filtered, hint);
+    } else {
+        println!("{}", filtered);
+    }
 
     timer.track(
         &format!("playwright {}", args.join(" ")),
@@ -325,7 +330,7 @@ pub fn run(args: &[String], verbose: u8) -> Result<()> {
 
     // Preserve exit code for CI/CD
     if !output.status.success() {
-        std::process::exit(output.status.code().unwrap_or(1));
+        std::process::exit(exit_code);
     }
 
     Ok(())

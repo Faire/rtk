@@ -193,8 +193,8 @@ fn run_pr(args: &[String], verbose: u8, ultra_compact: bool) -> Result<()> {
         "create" => pr_create(&args[1..], verbose),
         "merge" => pr_merge(&args[1..], verbose),
         "diff" => pr_diff(&args[1..], verbose),
-        "comment" => pr_action("commented", &args, verbose),
-        "edit" => pr_action("edited", &args, verbose),
+        "comment" => pr_action("commented", args, verbose),
+        "edit" => pr_action("edited", args, verbose),
         _ => run_passthrough("gh", "pr", args),
     }
 }
@@ -235,8 +235,8 @@ fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
             filtered.push_str("PRs\n");
             println!("PRs");
         } else {
-            filtered.push_str("📋 Pull Requests\n");
-            println!("📋 Pull Requests");
+            filtered.push_str("Pull Requests\n");
+            println!("Pull Requests");
         }
 
         for pr in prs.iter().take(20) {
@@ -254,10 +254,10 @@ fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
                 }
             } else {
                 match state {
-                    "OPEN" => "🟢",
-                    "MERGED" => "🟣",
-                    "CLOSED" => "🔴",
-                    _ => "⚪",
+                    "OPEN" => "[open]",
+                    "MERGED" => "[merged]",
+                    "CLOSED" => "[closed]",
+                    _ => "[unknown]",
                 }
             };
 
@@ -286,7 +286,13 @@ fn list_prs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
 fn should_passthrough_pr_view(extra_args: &[String]) -> bool {
     extra_args
         .iter()
-        .any(|a| a == "--json" || a == "--jq" || a == "--web")
+        .any(|a| a == "--json" || a == "--jq" || a == "--web" || a == "--comments")
+}
+
+fn should_passthrough_issue_view(extra_args: &[String]) -> bool {
+    extra_args
+        .iter()
+        .any(|a| a == "--json" || a == "--jq" || a == "--web" || a == "--comments")
 }
 
 fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
@@ -352,10 +358,10 @@ fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
         }
     } else {
         match state {
-            "OPEN" => "🟢",
-            "MERGED" => "🟣",
-            "CLOSED" => "🔴",
-            _ => "⚪",
+            "OPEN" => "[open]",
+            "MERGED" => "[merged]",
+            "CLOSED" => "[closed]",
+            _ => "[unknown]",
         }
     };
 
@@ -368,8 +374,8 @@ fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
     print!("{}", line);
 
     let mergeable_str = match mergeable {
-        "MERGEABLE" => "✓",
-        "CONFLICTING" => "✗",
+        "MERGEABLE" => "[ok]",
+        "CONFLICTING" => "[x]",
         _ => "?",
     };
     let line = format!("  {} | {}\n", state, mergeable_str);
@@ -417,11 +423,11 @@ fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
 
         if ultra_compact {
             if failed > 0 {
-                let line = format!("  ✗{}/{}  {} fail\n", passed, total, failed);
+                let line = format!("  [x]{}/{}  {} fail\n", passed, total, failed);
                 filtered.push_str(&line);
                 print!("{}", line);
             } else {
-                let line = format!("  ✓{}/{}\n", passed, total);
+                let line = format!("  {}/{}\n", passed, total);
                 filtered.push_str(&line);
                 print!("{}", line);
             }
@@ -430,7 +436,7 @@ fn view_pr(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
             filtered.push_str(&line);
             print!("{}", line);
             if failed > 0 {
-                let line = format!("  ⚠️  {} checks failed\n", failed);
+                let line = format!("  [warn] {} checks failed\n", failed);
                 filtered.push_str(&line);
                 print!("{}", line);
             }
@@ -504,9 +510,9 @@ fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> 
     let mut failed_checks = Vec::new();
 
     for line in stdout.lines() {
-        if line.contains('✓') || line.contains("pass") {
+        if line.contains("[ok]") || line.contains("pass") {
             passed += 1;
-        } else if line.contains('✗') || line.contains("fail") {
+        } else if line.contains("[x]") || line.contains("fail") {
             failed += 1;
             failed_checks.push(line.trim().to_string());
         } else if line.contains('*') || line.contains("pending") {
@@ -516,20 +522,20 @@ fn pr_checks(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> 
 
     let mut filtered = String::new();
 
-    let line = "🔍 CI Checks Summary:\n";
+    let line = "CI Checks Summary:\n";
     filtered.push_str(line);
     print!("{}", line);
 
-    let line = format!("  ✅ Passed: {}\n", passed);
+    let line = format!("  [ok] Passed: {}\n", passed);
     filtered.push_str(&line);
     print!("{}", line);
 
-    let line = format!("  ❌ Failed: {}\n", failed);
+    let line = format!("  [FAIL] Failed: {}\n", failed);
     filtered.push_str(&line);
     print!("{}", line);
 
     if pending > 0 {
-        let line = format!("  ⏳ Pending: {}\n", pending);
+        let line = format!("  [pending] Pending: {}\n", pending);
         filtered.push_str(&line);
         print!("{}", line);
     }
@@ -581,7 +587,7 @@ fn pr_status(_verbose: u8, _ultra_compact: bool) -> Result<()> {
     let mut filtered = String::new();
 
     if let Some(created_by) = json["createdBy"].as_array() {
-        let line = format!("📝 Your PRs ({}):\n", created_by.len());
+        let line = format!("Your PRs ({}):\n", created_by.len());
         filtered.push_str(&line);
         print!("{}", line);
         for pr in created_by.iter().take(5) {
@@ -636,13 +642,8 @@ fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
     let mut filtered = String::new();
 
     if let Some(issues) = json.as_array() {
-        if ultra_compact {
-            filtered.push_str("Issues\n");
-            println!("Issues");
-        } else {
-            filtered.push_str("🐛 Issues\n");
-            println!("🐛 Issues");
-        }
+        filtered.push_str("Issues\n");
+        println!("Issues");
         for issue in issues.iter().take(20) {
             let number = issue["number"].as_i64().unwrap_or(0);
             let title = issue["title"].as_str().unwrap_or("???");
@@ -656,9 +657,9 @@ fn list_issues(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()>
                 }
             } else {
                 if state == "OPEN" {
-                    "🟢"
+                    "[open]"
                 } else {
-                    "🔴"
+                    "[closed]"
                 }
             };
             let line = format!("  {} #{} {}\n", icon, number, truncate(title, 60));
@@ -684,6 +685,13 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
         Some(result) => result,
         None => return Err(anyhow::anyhow!("Issue number required")),
     };
+
+    // Passthrough when --comments, --json, --jq, or --web is present.
+    // --comments changes the output to include comments which our JSON
+    // field list doesn't request, causing silent data loss.
+    if should_passthrough_issue_view(&extra_args) {
+        return run_passthrough_with_extra("gh", &["issue", "view", &issue_number], &extra_args);
+    }
 
     let mut cmd = resolved_command("gh");
     cmd.args([
@@ -721,7 +729,11 @@ fn view_issue(args: &[String], _verbose: u8) -> Result<()> {
     let author = json["author"]["login"].as_str().unwrap_or("???");
     let url = json["url"].as_str().unwrap_or("");
 
-    let icon = if state == "OPEN" { "🟢" } else { "🔴" };
+    let icon = if state == "OPEN" {
+        "[open]"
+    } else {
+        "[closed]"
+    };
 
     let mut filtered = String::new();
 
@@ -814,8 +826,8 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
             filtered.push_str("Runs\n");
             println!("Runs");
         } else {
-            filtered.push_str("🏃 Workflow Runs\n");
-            println!("🏃 Workflow Runs");
+            filtered.push_str("Workflow Runs\n");
+            println!("Workflow Runs");
         }
         for run in runs {
             let id = run["databaseId"].as_i64().unwrap_or(0);
@@ -825,8 +837,8 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
 
             let icon = if ultra_compact {
                 match conclusion {
-                    "success" => "✓",
-                    "failure" => "✗",
+                    "success" => "[ok]",
+                    "failure" => "[x]",
                     "cancelled" => "X",
                     _ => {
                         if status == "in_progress" {
@@ -838,14 +850,14 @@ fn list_runs(args: &[String], _verbose: u8, ultra_compact: bool) -> Result<()> {
                 }
             } else {
                 match conclusion {
-                    "success" => "✅",
-                    "failure" => "❌",
-                    "cancelled" => "🚫",
+                    "success" => "[ok]",
+                    "failure" => "[FAIL]",
+                    "cancelled" => "[X]",
                     _ => {
                         if status == "in_progress" {
-                            "⏳"
+                            "[time]"
                         } else {
-                            "⚪"
+                            "[pending]"
                         }
                     }
                 }
@@ -910,7 +922,7 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
 
     let mut filtered = String::new();
 
-    let line = format!("🏃 Workflow Run #{}\n", run_id);
+    let line = format!("Workflow Run #{}\n", run_id);
     filtered.push_str(&line);
     print!("{}", line);
 
@@ -924,8 +936,8 @@ fn view_run(args: &[String], _verbose: u8) -> Result<()> {
                 // Skip successful jobs in compact mode
                 continue;
             }
-            if line.contains('✗') || line.contains("fail") {
-                let formatted = format!("  ❌ {}\n", line.trim());
+            if line.contains("[x]") || line.contains("fail") {
+                let formatted = format!("  [FAIL] {}\n", line.trim());
                 filtered.push_str(&formatted);
                 print!("{}", formatted);
             }
@@ -992,15 +1004,11 @@ fn run_repo(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> {
     let forks = json["forkCount"].as_i64().unwrap_or(0);
     let private = json["isPrivate"].as_bool().unwrap_or(false);
 
-    let visibility = if private {
-        "🔒 Private"
-    } else {
-        "🌐 Public"
-    };
+    let visibility = if private { "[private]" } else { "[public]" };
 
     let mut filtered = String::new();
 
-    let line = format!("📦 {}/{}\n", owner, name);
+    let line = format!("{}/{}\n", owner, name);
     filtered.push_str(&line);
     print!("{}", line);
 
@@ -1014,7 +1022,7 @@ fn run_repo(args: &[String], _verbose: u8, _ultra_compact: bool) -> Result<()> {
         print!("{}", line);
     }
 
-    let line = format!("  ⭐ {} stars | 🔱 {} forks\n", stars, forks);
+    let line = format!("  {} stars | {} forks\n", stars, forks);
     filtered.push_str(&line);
     print!("{}", line);
 
@@ -1110,6 +1118,18 @@ fn pr_merge(args: &[String], _verbose: u8) -> Result<()> {
     Ok(())
 }
 
+/// Flags that change `gh pr diff` output from unified diff to a different format.
+/// When present, compact_diff would produce empty output since it expects diff headers.
+fn has_non_diff_format_flag(args: &[String]) -> bool {
+    args.iter().any(|a| {
+        a == "--name-only"
+            || a == "--name-status"
+            || a == "--stat"
+            || a == "--numstat"
+            || a == "--shortstat"
+    })
+}
+
 fn pr_diff(args: &[String], _verbose: u8) -> Result<()> {
     // --no-compact: pass full diff through (gh CLI doesn't know this flag, strip it)
     let no_compact = args.iter().any(|a| a == "--no-compact");
@@ -1119,7 +1139,9 @@ fn pr_diff(args: &[String], _verbose: u8) -> Result<()> {
         .cloned()
         .collect();
 
-    if no_compact {
+    // Passthrough when --no-compact or when a format flag changes output away from
+    // unified diff (e.g. --name-only produces a filename list, not diff hunks).
+    if no_compact || has_non_diff_format_flag(&gh_args) {
         return run_passthrough_with_extra("gh", &["pr", "diff"], &gh_args);
     }
 
@@ -1493,8 +1515,81 @@ mod tests {
     }
 
     #[test]
-    fn test_should_passthrough_pr_view_other_flags() {
-        assert!(!should_passthrough_pr_view(&["--comments".into()]));
+    fn test_should_passthrough_pr_view_comments() {
+        assert!(should_passthrough_pr_view(&["--comments".into()]));
+    }
+
+    // --- should_passthrough_issue_view tests ---
+
+    #[test]
+    fn test_should_passthrough_issue_view_comments() {
+        assert!(should_passthrough_issue_view(&["--comments".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_json() {
+        assert!(should_passthrough_issue_view(&[
+            "--json".into(),
+            "body,comments".into()
+        ]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_jq() {
+        assert!(should_passthrough_issue_view(&[
+            "--jq".into(),
+            ".body".into()
+        ]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_web() {
+        assert!(should_passthrough_issue_view(&["--web".into()]));
+    }
+
+    #[test]
+    fn test_should_passthrough_issue_view_default() {
+        assert!(!should_passthrough_issue_view(&[]));
+    }
+
+    // --- has_non_diff_format_flag tests ---
+
+    #[test]
+    fn test_non_diff_format_flag_name_only() {
+        assert!(has_non_diff_format_flag(&["--name-only".into()]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_stat() {
+        assert!(has_non_diff_format_flag(&["--stat".into()]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_name_status() {
+        assert!(has_non_diff_format_flag(&["--name-status".into()]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_numstat() {
+        assert!(has_non_diff_format_flag(&["--numstat".into()]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_shortstat() {
+        assert!(has_non_diff_format_flag(&["--shortstat".into()]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_absent() {
+        assert!(!has_non_diff_format_flag(&[]));
+    }
+
+    #[test]
+    fn test_non_diff_format_flag_regular_args() {
+        assert!(!has_non_diff_format_flag(&[
+            "123".into(),
+            "--color=always".into()
+        ]));
     }
 
     // --- filter_markdown_body tests ---
